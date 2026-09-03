@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         Legionnaire Insights
 // @namespace    legionnaire-insights
-// @version      7.0
+// @version      7.0.1
 // @description  Shows hidden player potential, club strength, agents and odds; includes automatic conflict-safe cross-device sync and self-updating delivery.
 // @match        https://www.legionnaire.xyz/*
 // @grant        GM_xmlhttpRequest
@@ -16,160 +16,9 @@
 // @downloadURL  https://raw.githubusercontent.com/ofersi15/legionnaire-insights/main/legionnaire-insights.user.js
 // ==/UserScript==
 
-// ---------------------------------------------------------------------------
-// Changelog v6.6:
-// Fixed the reported "recent careers screen doesn't sync" symptom. Root cause:
-// after a cloud sync finished (a multi-step async chain: GET gist, merge,
-// PATCH gist), the script asked "Reload now?" via the native confirm()
-// dialog. On some mobile browsers (confirmed pattern on Firefox Android),
-// native confirm()/alert() dialogs fired from deep inside an async chain -
-// well after the click that started it - can be silently blocked or
-// auto-dismissed by the browser's dialog-spam protection, since the
-// "user activation" from the original click has expired by the time the
-// network round-trip finishes. When that happens the merge still succeeds
-// and localStorage is updated correctly, but the reload never fires, so any
-// screen already open (like the careers list) keeps showing the page's
-// original, pre-sync in-memory state. Fix: replaced every alert()/confirm()
-// used to report a sync result with an in-page modal (real DOM, a real
-// "Reload now" button) that can't be silently swallowed the way native
-// dialogs can.
-//
-// Also, per user request:
-//  - The sync report is now a real per-sport breakdown (careers count,
-//    trophy count, before -> after, plus what the cloud held before the
-//    merge) instead of terse one-line-per-key text. This also makes it
-//    directly visible that BOTH sports are always included in every sync,
-//    regardless of which sport is currently active on the device doing the
-//    sync (this was already true in the underlying merge logic - export
-//    always scans all maslul-kariera:* keys, not just the active sport's -
-//    but there was no visible confirmation of it before).
-//  - Cloud sync now re-fetches the gist after pushing and byte-compares it
-//    against what was just sent, and reports whether the cloud is verified
-//    to now hold exactly the same data as this device (rather than assuming
-//    the PATCH succeeded silently matches).
-//
-// Changelog v6.7 - two real bugs found from an actual sync report screenshot:
-//  1. The report's "(cloud had N)" trophy figures always showed 0. Trophy/
-//     collection keys are intentionally excluded from payload.data (they
-//     travel only as a per-device ledger in payload.ledgers.maps), but the
-//     snapshot code was reading them from payload.data anyway. Fixed to sum
-//     the ledger instead, matching how "Total completed careers" already did.
-//  2. The post-push "Verified: cloud matches" check failed on a real device
-//     even though the push had actually succeeded. Fixed by comparing
-//     trimmed strings (GitHub gist storage can normalize a trailing newline)
-//     and retrying the verification GET a couple of times with a short
-//     delay, in case it raced ahead of GitHub's own write propagation.
-// ---------------------------------------------------------------------------
-//
-// Changelog v6.8: the 6.7 fix for "Could not verify" was not enough - it
-// still failed consistently on a real mobile device even across 3 retries.
-// A retry only helps with a *transient* race; failing every single time
-// points to something that doesn't change between retries - almost
-// certainly the exact same GET URL being served from a cache instead of
-// actually reaching GitHub again. Fixed by (a) adding no-cache headers to
-// every GitHub request and (b) appending a unique cache-busting query
-// param to every GET (the initial pull AND every verification retry), so
-// a browser/extension-bridge HTTP cache can no longer return the same
-// pre-PATCH response no matter how many times we ask.
-// ---------------------------------------------------------------------------
-//
-// Changelog v6.9: added @updateURL/@downloadURL, both pointing to a raw
-// file named legionnaire-insights.user.js inside the SAME shared gist used
-// for game-data cloud sync (gist e1226286d7087eb8faacbf820b8b666f, owner
-// ofersi15) - reusing that gist rather than a separate one since both are
-// scoped to this one game/player and the token+gist are already set up on
-// both devices. This does NOT add any code that runs in the browser - it's
-// purely Tampermonkey's own built-in update-check metadata, which polls
-// that URL periodically (or on manual "check for updates") and offers to
-// update in-place when the @version there is newer than what's installed.
-// One-time setup required (see accompanying instructions): the gist needs
-// a NEW file added, named exactly legionnaire-insights.user.js, containing
-// this script's full text - and going forward, shipping a new script
-// version means updating that one gist file, not touching each device.
-// ---------------------------------------------------------------------------
-//
-// Changelog v6.10:
-//  1. Added a "Publish script to Gist" button (Script updates section) that
-//     pushes a pasted new script version straight into the gist's
-//     legionnaire-insights.user.js file via the same stored GitHub token
-//     already used for game-data sync - so shipping an update never
-//     requires opening GitHub's own (awkward-on-mobile) gist editor again.
-//  2. The "Could not verify" cloud-sync message was firing consistently on
-//     a real device even after the 6.8 cache-busting fix - which pointed
-//     away from caching and toward a different, evidenced cause: GM_xmlhttp
-//     Request has known issues handling large responses reliably on some
-//     mobile browsers (this payload's size, with full clubStats/trophy
-//     ledgers for 100+ careers, is substantial). Every actual count in the
-//     report was correct in the failing case, meaning the sync itself was
-//     never in doubt - only this extra verification round-trip was
-//     unreliable. Reworded the message to say so plainly instead of
-//     implying data loss and asking to re-run sync.
-// ---------------------------------------------------------------------------
-//
-// Changelog v6.11: "Publish script to Gist" used window.prompt() to collect
-// the pasted script text - native prompt() dialogs are effectively
-// single-line inputs and unreliable for pasting a whole file's worth of
-// text (tens of thousands of characters), as seen on a real device. Fixed
-// by replacing it with an in-page modal that has a real <textarea>, which
-// has no such practical limit.
-// ---------------------------------------------------------------------------
-//
-// Changelog v6.12: the 6.10 softening of the "Could not verify" message was
-// a mistake - it was reasoned from a plausible-sounding but WRONG theory
-// (large-response handling quirks). Independently re-fetching the gist's
-// raw content afterward (from outside any of the devices involved, so no
-// local caching could explain it) showed the cloud genuinely still held
-// the OLD pre-sync data - the push was truly not landing, not just failing
-// an unreliable check. Reworked verification to stop doing a separate
-// follow-up GET (which can itself be served stale) and instead read the
-// file content directly out of GitHub's own PATCH response - the most
-// direct evidence available for whether a write landed - and report a
-// mismatch as a real problem (with a byte-size comparison) rather than
-// something to shrug off.
-// ---------------------------------------------------------------------------
-//
-// Changelog v6.13: confirmed on a real device, via GitHub's own PATCH
-// response, that a single ~944KB sync payload was silently truncated to
-// ~834KB somewhere between the browser and GitHub - almost certainly a
-// message-size limit in the extension/browser bridge on that device, not
-// anything GitHub-side. Fixed properly this time: the sync payload is now
-// split across several smaller files in the same gist (meta, number
-// ledger, two map ledgers, two careers arrays, one "other" file), each
-// pushed with its own PATCH call and independently verified against
-// GitHub's echo of that specific piece. Pulling now fetches each file's
-// raw content individually too, rather than one large wrapped GET. The
-// CRDT merge logic itself is completely unchanged - only the transport
-// format changed. This does NOT require re-running "Publish script to
-// Gist" (that only affects the script file, not the sync data files); the
-// gist will simply gain several new legionnaire-sync-*.json files going
-// forward, and the old legionnaire-sync.json is left in place, unused.
-// ---------------------------------------------------------------------------
-//
-// Changelog v6.14: 6.13 confirmed the chunking fix works - 6 of 7 pieces
-// verified fine on a real device. The 7th (a small ~1.8KB file) failed the
-// immediate check with "got 0.0KB", which is a different failure mode from
-// the earlier truncation (that only ever hit large payloads) - most likely
-// the PATCH response not echoing a just-created file's content right away.
-// Added a fallback: any chunk that fails the immediate PATCH-echo check
-// gets one direct raw-URL read (after a brief delay) before being reported
-// as failed.
-// ---------------------------------------------------------------------------
-//
-// Changelog v6.15: 6.14's single-chunk fallback wasn't enough - a later
-// real-device run failed 4 of 7 chunks at once, including a sub-1KB meta
-// file, which isn't explainable by size or by a one-off echo delay. That
-// scattered, inconsistent pattern points to plain mobile network flakiness
-// at that moment rather than a specific bug to chase further. Rather than
-// asking the person to notice a failure and manually press Sync again,
-// both directions now retry automatically: each chunk push retries up to 3
-// times with increasing backoff before being reported as failed, and each
-// chunk pull retries up to 3 times on a network error. Also replaced
-// "Publish script to Gist"'s copy/paste-only flow with a file picker
-// (reads the downloaded .user.js via FileReader) - copying a long script
-// out of a chat client and pasting it in was reported as slow and fiddly;
-// choosing the already-downloaded file avoids that step entirely. Manual
-// paste is still available as a fallback underneath the file picker.
-// ---------------------------------------------------------------------------
+// Current architecture and release notes live in AGENTS.md, docs/PROJECT.md,
+// and CHANGELOG.md. Keep source comments limited to invariants and non-obvious
+// implementation constraints.
 
 (function () {
   'use strict';
@@ -743,115 +592,6 @@
     if (m) m.remove();
   }
 
-  // A large-text paste modal, used instead of window.prompt() for pasting a
-  // whole script file. Native prompt() dialogs are effectively single-line
-  // text inputs - pasting tens of thousands of characters into one is
-  // unreliable (can silently truncate or just refuse to hold that much) on
-  // several browsers, which is exactly what a full .user.js file needs.
-  // This uses a real <textarea>, which has no such practical limit.
-  function showPasteModal(title, description, opts = {}) {
-    return new Promise((resolve) => {
-      closeSyncModal();
-      const overlay = document.createElement('div');
-      overlay.id = 'legionnaire-insights-modal';
-      overlay.style.cssText = `
-        position: fixed; inset: 0; z-index: 1000000;
-        background: rgba(0,0,0,0.6); display: flex; align-items: center; justify-content: center;
-      `;
-      const box = document.createElement('div');
-      box.style.cssText = `
-        background: #0e0e12; color: #e5e7eb; border: 1px solid #444; border-radius: 10px;
-        padding: 16px; width: min(420px, 92vw); max-height: 85vh; overflow: auto;
-        font: 12px monospace; line-height: 1.6; direction: ltr; text-align: left;
-        display: flex; flex-direction: column;
-      `;
-      const heading = document.createElement('b');
-      heading.style.cssText = 'color:#4ade80; font-size:13px;';
-      heading.textContent = title;
-      const desc = document.createElement('div');
-      desc.style.cssText = 'margin-top:8px; margin-bottom:8px; opacity:.8;';
-      desc.textContent = description;
-
-      let fileRow = null;
-      let fileStatus = null;
-      if (opts.allowFile) {
-        // Picking a downloaded file and reading it via FileReader avoids
-        // copy/paste entirely - added because copying a long script out of
-        // a chat client and pasting it here was reported as slow and
-        // fiddly. Selecting a file submits immediately (no extra click).
-        fileRow = document.createElement('div');
-        fileRow.style.cssText = 'margin-bottom:10px; padding:8px; border:1px dashed #4ade80; border-radius:6px;';
-        const fileLabel = document.createElement('div');
-        fileLabel.style.cssText = 'color:#4ade80; font-weight:bold; margin-bottom:6px;';
-        fileLabel.textContent = 'Recommended: choose the downloaded file';
-        const fileInput = document.createElement('input');
-        fileInput.type = 'file';
-        if (opts.fileAccept) fileInput.accept = opts.fileAccept;
-        fileInput.style.cssText = 'width:100%; color:#e5e7eb; font:11px monospace;';
-        fileStatus = document.createElement('div');
-        fileStatus.style.cssText = 'margin-top:6px; opacity:.6; font-size:10px;';
-        fileInput.addEventListener('change', () => {
-          const f = fileInput.files && fileInput.files[0];
-          if (!f) return;
-          fileStatus.textContent = `Reading ${f.name}...`;
-          const reader = new FileReader();
-          reader.onload = () => {
-            overlay.remove();
-            resolve(String(reader.result || ''));
-          };
-          reader.onerror = () => {
-            fileStatus.textContent = `Could not read ${f.name} - try pasting the text below instead.`;
-          };
-          reader.readAsText(f);
-        });
-        fileRow.appendChild(fileLabel);
-        fileRow.appendChild(fileInput);
-        fileRow.appendChild(fileStatus);
-      }
-
-      const pasteLabel = document.createElement('div');
-      pasteLabel.style.cssText = 'opacity:.6; margin-bottom:4px; font-size:10px;';
-      pasteLabel.textContent = opts.allowFile ? 'Or paste manually:' : 'Paste here:';
-
-      const textarea = document.createElement('textarea');
-      textarea.style.cssText = `
-        width: 100%; height: 220px; background:#0a0a0d; color:#e5e7eb;
-        border:1px solid #444; border-radius:6px; padding:8px; font:11px monospace;
-        resize: vertical; box-sizing: border-box;
-      `;
-      textarea.placeholder = 'Paste here...';
-
-      const btnRow = document.createElement('div');
-      btnRow.style.cssText = 'display:flex; gap:8px; margin-top:12px;';
-      const okBtn = document.createElement('button');
-      okBtn.textContent = 'Continue';
-      okBtn.style.cssText = 'flex:1; background:#4ade80; color:#05230f; border:none; border-radius:6px; padding:8px; font:12px monospace; font-weight:bold; cursor:pointer;';
-      okBtn.addEventListener('click', () => {
-        overlay.remove();
-        resolve(textarea.value || null);
-      });
-      const cancelBtn = document.createElement('button');
-      cancelBtn.textContent = 'Cancel';
-      cancelBtn.style.cssText = 'flex:1; background:#222; color:#e5e7eb; border:1px solid #444; border-radius:6px; padding:8px; font:12px monospace; cursor:pointer;';
-      cancelBtn.addEventListener('click', () => {
-        overlay.remove();
-        resolve(null);
-      });
-      btnRow.appendChild(okBtn);
-      btnRow.appendChild(cancelBtn);
-
-      box.appendChild(heading);
-      box.appendChild(desc);
-      if (fileRow) box.appendChild(fileRow);
-      box.appendChild(pasteLabel);
-      box.appendChild(textarea);
-      box.appendChild(btnRow);
-      overlay.appendChild(box);
-      document.body.appendChild(overlay);
-      if (!opts.allowFile) textarea.focus();
-    });
-  }
-
   function showSyncModal(title, lines, opts = {}) {
     closeSyncModal();
     const overlay = document.createElement('div');
@@ -1026,43 +766,6 @@
       showSyncModal('Export ready', lines, {});
     } catch (e) {
       showSyncModal('Export failed', [String(e.message || e)], {});
-    }
-  }
-
-  // ---------- Publish a new script version to the same gist ----------
-  // Lets a new script version reach the gist's legionnaire-insights.user.js
-  // file (the file @updateURL/@downloadURL point at) without ever opening
-  // GitHub's own edit UI - which is awkward on a phone and easy to fumble
-  // on a large file. This reuses the SAME stored token/gist already set up
-  // for game-data cloud sync: the push happens from this device, with the
-  // token already sitting in its own localStorage, never touching anything
-  // outside the browser running it. Paste the new script's full text when
-  // prompted, then click the button - one step, from either device.
-  async function publishScriptUpdate() {
-    const newText = await showPasteModal(
-      'Publish script to Gist',
-      'Choose the downloaded .user.js file below - no need to copy/paste. This will overwrite legionnaire-insights.user.js inside the shared gist.',
-      { allowFile: true, fileAccept: '.js,.user.js,text/javascript' }
-    );
-    if (!newText) return;
-    if (!newText.includes('==UserScript==') || !newText.includes('@version')) {
-      if (!confirm("This doesn't look like a full userscript (no ==UserScript== header found). Push it anyway?")) return;
-    }
-    try {
-      const gistId = await ensureGistId();
-      await ghRequestAuto('PATCH', `https://api.github.com/gists/${gistId}`, {
-        files: { 'legionnaire-insights.user.js': { content: newText } },
-      });
-      const versionMatch = newText.match(/@version\s+([^\s]+)/);
-      const lines = [
-        `Pushed ${(newText.length / 1024).toFixed(1)}KB to the gist as legionnaire-insights.user.js.`,
-        versionMatch ? `Detected version: <b>${versionMatch[1]}</b>` : '',
-        '',
-        'On each device with this script already installed (and @updateURL set), open Tampermonkey\'s dashboard and use "Check for userscript updates" to pick it up now - or it\'ll be picked up on the next automatic check.',
-      ].filter(Boolean);
-      showSyncModal('Script published to gist', lines, {});
-    } catch (e) {
-      showSyncModal('Publish failed', [String(e.message || e)], {});
     }
   }
 
@@ -1752,11 +1455,6 @@
         </div>
         <button id="li-reset-cloud" style="width:100%; margin-top:4px; background:transparent; color:#666; border:none; font:9px monospace; cursor:pointer; text-decoration:underline;">reset cloud sync settings</button>
       </div>
-      <div style="border-top:1px solid #333; margin-top:8px; padding-top:8px;">
-        <b style="color:#4ade80">Script updates</b><br>
-        <div style="opacity:.5; margin:4px 0; font-size:9px;">Pushes a new script version straight into the gist (uses the same token above) - no need to open GitHub's editor.</div>
-        <button id="li-publish-script" style="width:100%; margin-top:4px; background:#222; color:#4ade80; border:1px solid #444; border-radius:4px; padding:5px; font:10px monospace; cursor:pointer;">Publish script to Gist</button>
-      </div>
     `;
     panel.appendChild(tools);
 
@@ -1772,7 +1470,6 @@
       if (autoSyncToggle.checked) scheduleAutoSync('manual-enable', 0);
     });
     tools.querySelector('#li-reset-cloud').addEventListener('click', () => resetCloudSettings());
-    tools.querySelector('#li-publish-script').addEventListener('click', () => publishScriptUpdate());
 
     document.body.appendChild(panel);
 
