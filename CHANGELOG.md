@@ -1,5 +1,16 @@
 # Changelog
 
+## 7.3.0 - 2026-09-03
+
+- Moved live player insights into the game's own decision layout instead of keeping the overlay open over gameplay.
+- Added an in-flow Potential/growth/development strip with on-demand Details and Tools controls.
+- Annotated visible club choices with tier and overall from the live game bundle, and highlights the highest-OVR offer without replacing the game's click targets.
+- Added compact probability annotations when a decision option exposes multiple outcomes.
+- Migrated the legacy overlay to hidden once on upgrade; the LI launcher remains available on screens without a live decision.
+- Kept Agents, Seed Finder, update controls and sync in the existing panel, with Rafi Ben-Ami's club IDs still resolved to names from live club data.
+- Split runtime delivery so the 7.2 sync/update core is frozen unchanged and the 7.3 native UI is isolated in a versioned addon.
+- Passed JavaScript syntax checks for the deployable wrapper and native UI addon. Live DOM/device validation is still required on the real game because CI cannot reproduce its browser state.
+
 ## 7.2.0 - 2026-09-03
 
 - Added an independent version check on startup, tab resume and every manual cloud sync.
