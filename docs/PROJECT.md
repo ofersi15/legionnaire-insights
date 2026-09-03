@@ -3,7 +3,7 @@
 ## Current state
 
 - Userscript: `legionnaire-insights.user.js`
-- Current release: `7.2.0`
+- Current release: `7.3.0`
 - Target: `https://www.legionnaire.xyz/*`
 - Desktop: Chrome; mobile: Firefox Android; both use Tampermonkey.
 - Code delivery: public GitHub raw URL in `@updateURL` and `@downloadURL`.
@@ -16,10 +16,19 @@ The game is a React SPA with no account/backend. Saves are event-sourced in orig
 - Hidden overall, potential, development profile, age and position.
 - Club name/tier/overall lookup from the live Vite bundle.
 - Agent reference table and probabilistic decision previews.
-- Responsive overlay with compact, tabbed and hidden modes; expanded mobile view is a bottom sheet.
+- Native in-flow live insights beside decision choices; the responsive tabbed overlay is secondary UI for verbose details, agents, tools and sync.
 - Seed Finder with apply-and-reload.
 - Automatic cross-device synchronization plus manual export/import fallback.
 - Hourly version awareness on startup/resume and manual sync, with an in-panel install link when GitHub has a newer release.
+
+## Runtime layout
+
+`legionnaire-insights.user.js` is now a small Tampermonkey entry point. It `@require`s two versioned runtime files from this repository:
+
+- `runtime/legionnaire-insights-core-7.2.0.js` — frozen 7.2 core containing sync, update checks, tools and the secondary panel.
+- `runtime/native-ui-7.3.0.js` — native decision-screen enhancements that inject only presentation-layer metadata into the live game DOM.
+
+The split intentionally isolates the new UI work from the proven sync/update path. Future releases may fold the files back together once native DOM integration is proven stable on both real devices.
 
 ## Important game keys
 
@@ -60,7 +69,7 @@ The Gist token requires only **Gists: Read and write**. v7 migrates the old `leg
 
 ## Release flow
 
-1. Modify the userscript.
+1. Modify the userscript/runtime.
 2. Increment `@version`.
 3. Run syntax and sync-focused tests.
 4. Update `CHANGELOG.md`; update this file only for architectural changes.
@@ -72,6 +81,7 @@ The panel also checks the same raw URL at most hourly (or immediately on a manua
 
 ## Near-term cleanup
 
+- Validate native decision-card injection on desktop and Firefox Android across club-choice and probabilistic-decision screens.
 - Validate v7 migration and background behavior on both real devices.
 - After both device snapshot files exist and are proven stable, remove the dormant v6.15 chunk transport.
 - If active careers with different seeds must be handed off, add explicit conflict selection; never use silent last-write-wins.
