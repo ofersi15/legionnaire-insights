@@ -3,7 +3,7 @@
 ## Current state
 
 - Userscript: `legionnaire-insights.user.js`
-- Current release: `7.0.1`
+- Current release: `7.1.0`
 - Target: `https://www.legionnaire.xyz/*`
 - Desktop: Chrome; mobile: Firefox Android; both use Tampermonkey.
 - Code delivery: public GitHub raw URL in `@updateURL` and `@downloadURL`.
@@ -16,6 +16,7 @@ The game is a React SPA with no account/backend. Saves are event-sourced in orig
 - Hidden overall, potential, development profile, age and position.
 - Club name/tier/overall lookup from the live Vite bundle.
 - Agent reference table and probabilistic decision previews.
+- Responsive overlay with compact, tabbed and hidden modes; expanded mobile view is a bottom sheet.
 - Seed Finder with apply-and-reload.
 - Automatic cross-device synchronization plus manual export/import fallback.
 

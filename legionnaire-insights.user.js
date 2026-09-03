@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         Legionnaire Insights
 // @namespace    legionnaire-insights
-// @version      7.0.1
+// @version      7.1.0
 // @description  Shows hidden player potential, club strength, agents and odds; includes automatic conflict-safe cross-device sync and self-updating delivery.
 // @match        https://www.legionnaire.xyz/*
 // @grant        GM_xmlhttpRequest
@@ -81,7 +81,8 @@
   // bundle's internal layout changes after a future deploy.
 
   let clubsById = null; // Map<id, {name, league, tier, ovr}>
-  let clubsLoadAttempted = false;
+  let clubsLoadPromise = null;
+  let clubsNextAttemptAt = 0;
 
   // The bundle embeds several separate club datasets (local + foreign,
   // football + basketball) as `JSON.parse(\`...\`)` blocks, in two
@@ -91,13 +92,19 @@
   // We scan every such block in the bundle and merge whichever ones look
   // like club data into one unified id -> info map.
   async function loadClubsDb() {
-    if (clubsLoadAttempted) return;
-    clubsLoadAttempted = true;
-    try {
-      const scriptTag = document.querySelector('script[src*="/assets/index-"]');
-      if (!scriptTag) return;
-      const res = await fetch(scriptTag.src);
-      const src = await res.text();
+    if (clubsById) return clubsById;
+    if (clubsLoadPromise) return clubsLoadPromise;
+    if (Date.now() < clubsNextAttemptAt) return null;
+    clubsLoadPromise = (async () => {
+      try {
+        const scriptTag = [...document.scripts].find((s) => /\/assets\/index-[^/]+\.js/.test(s.src));
+        if (!scriptTag) {
+          clubsNextAttemptAt = Date.now() + 1000;
+          return null;
+        }
+        const res = await fetch(scriptTag.src);
+        if (!res.ok) throw new Error(`club bundle request failed: ${res.status}`);
+        const src = await res.text();
 
       const marker = 'JSON.parse(`';
       const map = new Map();
@@ -131,24 +138,33 @@
         }
       }
 
-      if (map.size > 0) clubsById = map;
-    } catch (e) {
-      clubsById = null; // fail quietly
-    }
+        if (map.size > 0) clubsById = map;
+        return clubsById;
+      } catch (e) {
+        clubsById = null; // fail quietly
+        clubsNextAttemptAt = Date.now() + 10000;
+        return null;
+      } finally {
+        clubsLoadPromise = null;
+      }
+    })();
+    const result = await clubsLoadPromise;
+    if (result) render();
+    return result;
   }
 
   function describeClub(clubId) {
     if (!clubId) return null;
-    if (!clubsById) return clubId;
+    if (!clubsById) return 'טוען שם קבוצה…';
     const c = clubsById.get(clubId);
-    if (!c) return clubId;
+    if (!c) return 'קבוצה לא מזוהה';
     return `${c.name} (T${c.tier}, OVR ${c.ovr})`;
   }
 
   // ---------- Static agent reference table (from the game's own data, doesn't change per-save) ----------
 
   const AGENTS = [
-    { name: 'רפי בן־עמי (מקומי)', cond: 'תמיד זמין', bonus: '+30% הצעות / +5% שווי — רק ב-il-1061, il-2173, il-2182' },
+    { name: 'רפי בן־עמי (מקומי)', cond: 'תמיד זמין', bonus: '+30% הצעות / +5% שווי', clubIds: ['il-1061', 'il-2173', 'il-2182'] },
     { name: 'מוטי אשכנזי (מחובר)', cond: 'overall > 66', bonus: '+40% הצעות / +~5% שווי בכל קבוצה בליגת העל' },
     { name: 'עדן רויטפרב (MLS)', cond: 'age > 18 וגם overall > 72', bonus: '+40% הצעות / +~4% שווי בקבוצות MLS/US' },
     { name: 'יורם שגיב (בינלאומי)', cond: 'age > 19 וגם overall > 76', bonus: '+50% הצעות / +4.5% שווי בקבוצות בלגיה' },
@@ -1379,12 +1395,20 @@
   }
 
   const MODE_KEY = 'legionnaire-insights:mode';
+  const TAB_KEY = 'legionnaire-insights:tab';
   function getMode() {
     try {
-      return localStorage.getItem(MODE_KEY) || 'full';
+      return localStorage.getItem(MODE_KEY) || (matchMedia('(max-width: 640px)').matches ? 'compact' : 'full');
     } catch (e) {
       return 'full';
     }
+  }
+  function getTab() {
+    try { return localStorage.getItem(TAB_KEY) || 'now'; } catch (e) { return 'now'; }
+  }
+  function setTab(tab) {
+    try { localStorage.setItem(TAB_KEY, tab); } catch (e) {}
+    buildChrome();
   }
   function setMode(m) {
     try { localStorage.setItem(MODE_KEY, m); } catch (e) {}
@@ -1400,32 +1424,73 @@
 
     panel = document.createElement('div');
     panel.id = 'legionnaire-insights-panel';
-    panel.style.cssText = `
-      position: fixed; top: 10px; left: 10px; z-index: 999999;
-      background: rgba(10,10,15,0.95); color: #e5e7eb; font: 11px monospace;
-      border-radius: 8px; width: 240px; max-height: 70vh;
-      border: 1px solid #333; direction: ltr; text-align: left;
-      display: flex; flex-direction: column; overflow: hidden;
+    panel.className = 'li-panel';
+
+    const style = document.createElement('style');
+    style.textContent = `
+      .li-panel { position:fixed; top:12px; left:12px; z-index:999999; box-sizing:border-box;
+        width:min(340px, calc(100vw - 24px)); max-height:calc(100dvh - 24px); overflow:hidden;
+        display:flex; flex-direction:column; color:#f3f4f6; background:rgba(8,10,15,.96);
+        border:1px solid #3f4652; border-radius:12px; box-shadow:0 12px 35px rgba(0,0,0,.42);
+        font:13px/1.45 ui-monospace, SFMono-Regular, Consolas, monospace; direction:ltr; text-align:left;
+        backdrop-filter:blur(10px); }
+      .li-panel *, .li-reopen { box-sizing:border-box; }
+      .li-header { min-height:42px; display:flex; align-items:center; justify-content:space-between;
+        padding:8px 10px; border-bottom:1px solid #303641; flex-shrink:0; }
+      .li-tabs { display:grid; grid-template-columns:repeat(3, 1fr); gap:5px; padding:7px 8px;
+        border-bottom:1px solid #303641; flex-shrink:0; }
+      .li-tab { border:1px solid #3b4350; border-radius:7px; padding:6px 4px; background:#171a21;
+        color:#cbd5e1; font:600 11px ui-monospace,monospace; cursor:pointer; }
+      .li-tab[aria-selected="true"] { color:#05230f; border-color:#4ade80; background:#4ade80; }
+      .li-pane { padding:10px; overflow:auto; overscroll-behavior:contain; min-height:0; }
+      .li-panel[data-mode="compact"] { width:auto; max-width:calc(100vw - 24px); }
+      .li-panel[data-mode="compact"] .li-header { border-bottom:0; min-height:38px; gap:10px; }
+      .li-panel[data-mode="compact"] .li-tabs, .li-panel[data-mode="compact"] #legionnaire-insights-tools,
+      .li-panel[data-mode="compact"] #legionnaire-insights-agents { display:none!important; }
+      .li-panel[data-mode="compact"] #legionnaire-insights-content { padding:0 10px 9px; overflow:hidden; white-space:nowrap; }
+      .li-btn { background:#20242c; color:#f3f4f6; border:1px solid #4b5563; border-radius:6px;
+        min-width:25px; height:25px; padding:0 6px; font:700 13px ui-monospace,monospace; cursor:pointer; }
+      @media (max-width: 640px) {
+        .li-panel[data-mode="full"] { top:auto; bottom:8px; left:8px; width:calc(100vw - 16px);
+          max-height:min(62dvh, 560px); border-radius:16px; }
+        .li-panel[data-mode="compact"] { top:auto; bottom:10px; left:10px; }
+        .li-pane { font-size:13px; line-height:1.55; }
+        .li-tab { min-height:36px; font-size:12px; }
+      }
+      @media (max-height: 650px) and (min-width: 641px) {
+        .li-panel[data-mode="full"] { max-height:calc(100dvh - 16px); top:8px; }
+      }
     `;
+    document.head.appendChild(style);
 
     const header = document.createElement('div');
     header.id = 'legionnaire-insights-header';
-    header.style.cssText = `
-      display: flex; align-items: center; justify-content: space-between;
-      padding: 6px 8px; border-bottom: 1px solid #333; flex-shrink: 0;
-    `;
+    header.className = 'li-header';
     panel.appendChild(header);
+
+    const tabs = document.createElement('div');
+    tabs.id = 'legionnaire-insights-tabs';
+    tabs.className = 'li-tabs';
+    for (const [id, label] of [['now', 'עכשיו'], ['tools', 'כלים'], ['agents', 'סוכנים']]) {
+      const button = document.createElement('button');
+      button.className = 'li-tab';
+      button.dataset.tab = id;
+      button.textContent = label;
+      button.addEventListener('click', () => setTab(id));
+      tabs.appendChild(button);
+    }
+    panel.appendChild(tabs);
 
     const content = document.createElement('div');
     content.id = 'legionnaire-insights-content';
-    content.style.cssText = `padding: 8px; overflow: auto; line-height: 1.5;`;
+    content.className = 'li-pane';
     panel.appendChild(content);
 
     // Seed tools: a separate, persistent section (never touched by render()'s
     // innerHTML rewrite, so its inputs/results survive every poll tick).
     const tools = document.createElement('div');
     tools.id = 'legionnaire-insights-tools';
-    tools.style.cssText = `padding: 8px; border-top: 1px solid #333; overflow: auto;`;
+    tools.className = 'li-pane';
     tools.innerHTML = `
       <b style="color:#4ade80">Seed Finder</b><br>
       <div style="display:flex; gap:4px; margin:4px 0; flex-wrap:wrap;">
@@ -1458,6 +1523,11 @@
     `;
     panel.appendChild(tools);
 
+    const agents = document.createElement('div');
+    agents.id = 'legionnaire-insights-agents';
+    agents.className = 'li-pane';
+    panel.appendChild(agents);
+
     tools.querySelector('#li-search').addEventListener('click', () => runSeedSearch());
     tools.querySelector('#li-export').addEventListener('click', () => doExport());
     tools.querySelector('#li-import').addEventListener('click', () => doImport());
@@ -1476,12 +1546,13 @@
     // Small reopen button, shown only when mode === 'hidden'
     const reopen = document.createElement('button');
     reopen.id = 'legionnaire-insights-reopen';
+    reopen.className = 'li-reopen';
     reopen.textContent = 'LI';
     reopen.style.cssText = `
       position: fixed; top: 10px; left: 10px; z-index: 999999;
-      width: 30px; height: 30px; border-radius: 50%; border: 1px solid #333;
+      width: 38px; height: 38px; border-radius: 50%; border: 1px solid #475569;
       background: rgba(10,10,15,0.95); color: #4ade80; font: bold 11px monospace;
-      cursor: pointer; display: none;
+      cursor: pointer; display: none; box-shadow:0 6px 18px rgba(0,0,0,.35);
     `;
     reopen.addEventListener('click', () => setMode('compact'));
     document.body.appendChild(reopen);
@@ -1539,6 +1610,8 @@
     const header = document.getElementById('legionnaire-insights-header');
     const content = document.getElementById('legionnaire-insights-content');
     const tools = document.getElementById('legionnaire-insights-tools');
+    const agents = document.getElementById('legionnaire-insights-agents');
+    const tabs = document.getElementById('legionnaire-insights-tabs');
     const reopen = document.getElementById('legionnaire-insights-reopen');
     const mode = getMode();
 
@@ -1549,9 +1622,13 @@
     }
     panel.style.display = 'flex';
     reopen.style.display = 'none';
-    panel.style.width = mode === 'compact' ? '150px' : '260px';
-    content.style.display = 'block';
-    tools.style.display = mode === 'compact' ? 'none' : 'block';
+    panel.dataset.mode = mode;
+    const activeTab = getTab();
+    tabs.style.display = mode === 'compact' ? 'none' : 'grid';
+    content.style.display = mode === 'compact' || activeTab === 'now' ? 'block' : 'none';
+    tools.style.display = mode === 'full' && activeTab === 'tools' ? 'block' : 'none';
+    agents.style.display = mode === 'full' && activeTab === 'agents' ? 'block' : 'none';
+    tabs.querySelectorAll('.li-tab').forEach((b) => b.setAttribute('aria-selected', String(b.dataset.tab === activeTab)));
 
     header.innerHTML = '';
     const title = document.createElement('b');
@@ -1566,21 +1643,17 @@
       const b = document.createElement('button');
       b.textContent = label;
       b.title = title_;
-      b.style.cssText = `
-        background: #222; color: #e5e7eb; border: 1px solid #444; border-radius: 4px;
-        width: 18px; height: 18px; font: 10px monospace; cursor: pointer; line-height: 1;
-        padding: 0;
-      `;
+      b.className = 'li-btn';
       b.addEventListener('click', onClick);
       return b;
     };
 
     if (mode === 'full') {
-      btns.appendChild(mkBtn('–', 'Compact mode (potential only)', () => setMode('compact')));
+      btns.appendChild(mkBtn('−', 'Compact mode', () => setMode('compact')));
     } else {
       btns.appendChild(mkBtn('+', 'Full mode', () => setMode('full')));
     }
-    btns.appendChild(mkBtn('x', 'Hide', () => setMode('hidden')));
+    btns.appendChild(mkBtn('×', 'Hide', () => setMode('hidden')));
     header.appendChild(btns);
   }
 
@@ -1619,7 +1692,22 @@
 
     ensurePanel();
     const content = document.getElementById('legionnaire-insights-content');
+    const agents = document.getElementById('legionnaire-insights-agents');
     if (!content) return;
+
+    if (!clubsById && !clubsLoadPromise) loadClubsDb();
+
+    if (agents) {
+      const agentLines = ['<b style="color:#4ade80">סוכנים</b>', '<span style="opacity:.65">מידע קבוע לעיון — מוסתר מהמסך הראשי.</span>', ''];
+      AGENTS.forEach((a) => {
+        agentLines.push(`<b>${a.name}</b>`);
+        agentLines.push(`<span style="opacity:.72">תנאי: ${a.cond}</span>`);
+        agentLines.push(a.bonus);
+        if (a.clubIds) agentLines.push(`<span style="opacity:.78">קבוצות: ${a.clubIds.map(describeClub).join(' · ')}</span>`);
+        agentLines.push('');
+      });
+      agents.innerHTML = agentLines.join('<br>');
+    }
 
     const lines = [];
 
@@ -1627,7 +1715,7 @@
       // Just the potential (and the gap) - Overall is already shown in-game.
       if (player) {
         const gap = player.potential - player.overall;
-        lines.push(`POT <b style="color:#facc15">${player.potential}</b> <span style="opacity:.6">(&Delta;${gap})</span>`);
+        lines.push(`POT <b style="color:#facc15">${player.potential}</b> <span style="opacity:.7">Δ${gap} · ${player.developmentProfile}</span>`);
       } else {
         lines.push('(no player data)');
       }
@@ -1667,14 +1755,6 @@
       }
     }
 
-    lines.push('');
-    lines.push('<b>Agents (reference)</b>');
-    AGENTS.forEach((a) => {
-      lines.push(`&nbsp;&nbsp;<b>${a.name}</b>`);
-      lines.push(`&nbsp;&nbsp;&nbsp;&nbsp;cond: ${a.cond}`);
-      lines.push(`&nbsp;&nbsp;&nbsp;&nbsp;${a.bonus}`);
-    });
-
     content.innerHTML = lines.join('<br>');
   }
 
@@ -1682,6 +1762,7 @@
   // updating the panel's own innerHTML would itself trigger the observer
   // and create an infinite render loop that freezes the tab.
   loadClubsDb();
+  window.addEventListener('load', () => loadClubsDb());
   buildChrome();
   maybeAutoContinue();
   initAutoSync();
