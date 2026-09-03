@@ -37,6 +37,8 @@ At minimum run:
 node --check legionnaire-insights.user.js
 ```
 
+The same syntax and metadata checks run automatically in GitHub Actions.
+
 For sync changes also test compression round-trip, checksum rejection, idempotent repeated merge, two independent device files and same-seed advancement. Record only the result in the changelog; do not commit large fixtures.
 
 ## Documentation budget
