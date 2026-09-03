@@ -63,7 +63,7 @@ The Gist token requires only **Gists: Read and write**. v7 migrates the old `leg
 3. Run syntax and sync-focused tests.
 4. Update `CHANGELOG.md`; update this file only for architectural changes.
 5. Commit the deployable file to `main`.
-6. Read back the GitHub file and verify its header/raw URL.
+6. Confirm the GitHub Actions validation and read back the file header/raw URL.
 
 Tampermonkey detects a higher `@version` from the raw URL. Script Sync may additionally be enabled in Tampermonkey on both browsers, but it is not used for game-save data.
 
