@@ -1,5 +1,13 @@
 # Changelog
 
+## 7.2.0 - 2026-09-03
+
+- Added an independent version check on startup, tab resume and every manual cloud sync.
+- Added a manual Check now control and an Install update link in the Tools tab.
+- Added a yellow version badge in the panel header whenever a newer release is available.
+- Limited background checks to once per hour while keeping forced manual/sync checks immediate.
+- Kept code-update checks separate from saved-game synchronization; installation remains user-confirmed by Tampermonkey.
+
 ## 7.1.0 - 2026-09-03
 
 - Rebuilt the overlay as a responsive three-state interface: compact HUD, tabbed panel and hidden launcher.

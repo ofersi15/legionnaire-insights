@@ -3,7 +3,7 @@
 ## Current state
 
 - Userscript: `legionnaire-insights.user.js`
-- Current release: `7.1.0`
+- Current release: `7.2.0`
 - Target: `https://www.legionnaire.xyz/*`
 - Desktop: Chrome; mobile: Firefox Android; both use Tampermonkey.
 - Code delivery: public GitHub raw URL in `@updateURL` and `@downloadURL`.
@@ -19,6 +19,7 @@ The game is a React SPA with no account/backend. Saves are event-sourced in orig
 - Responsive overlay with compact, tabbed and hidden modes; expanded mobile view is a bottom sheet.
 - Seed Finder with apply-and-reload.
 - Automatic cross-device synchronization plus manual export/import fallback.
+- Hourly version awareness on startup/resume and manual sync, with an in-panel install link when GitHub has a newer release.
 
 ## Important game keys
 
@@ -67,6 +68,7 @@ The Gist token requires only **Gists: Read and write**. v7 migrates the old `leg
 6. Confirm the GitHub Actions validation and read back the file header/raw URL.
 
 Tampermonkey detects a higher `@version` from the raw URL. Script Sync may additionally be enabled in Tampermonkey on both browsers, but it is not used for game-save data.
+The panel also checks the same raw URL at most hourly (or immediately on a manual check/sync). It can surface and open an update, but Tampermonkey remains responsible for installing it.
 
 ## Near-term cleanup
 

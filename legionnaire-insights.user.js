@@ -1,15 +1,17 @@
 // ==UserScript==
 // @name         Legionnaire Insights
 // @namespace    legionnaire-insights
-// @version      7.1.0
+// @version      7.2.0
 // @description  Shows hidden player potential, club strength, agents and odds; includes automatic conflict-safe cross-device sync and self-updating delivery.
 // @match        https://www.legionnaire.xyz/*
 // @grant        GM_xmlhttpRequest
 // @grant        GM_getValue
 // @grant        GM_setValue
 // @grant        GM_deleteValue
+// @grant        GM_info
 // @connect      api.github.com
 // @connect      gist.githubusercontent.com
+// @connect      raw.githubusercontent.com
 // @homepageURL  https://github.com/ofersi15/legionnaire-insights
 // @source       https://github.com/ofersi15/legionnaire-insights
 // @updateURL    https://raw.githubusercontent.com/ofersi15/legionnaire-insights/main/legionnaire-insights.user.js
@@ -22,6 +24,88 @@
 
 (function () {
   'use strict';
+
+  // ---------- Userscript update awareness ----------
+
+  const SCRIPT_UPDATE_URL = 'https://raw.githubusercontent.com/ofersi15/legionnaire-insights/main/legionnaire-insights.user.js';
+  const UPDATE_LAST_CHECK_GM_KEY = 'legionnaire-insights:update-last-check';
+  const UPDATE_LATEST_GM_KEY = 'legionnaire-insights:update-latest-version';
+  const UPDATE_CHECK_INTERVAL_MS = 60 * 60 * 1000;
+  let updateCheckInFlight = null;
+  let latestScriptVersion = GM_getValue(UPDATE_LATEST_GM_KEY, '');
+  let updateCheckMessage = '';
+
+  function currentScriptVersion() {
+    return (typeof GM_info !== 'undefined' && GM_info.script && GM_info.script.version) || '7.2.0';
+  }
+
+  function compareVersions(a, b) {
+    const left = String(a).split('.').map((n) => Number(n) || 0);
+    const right = String(b).split('.').map((n) => Number(n) || 0);
+    for (let i = 0; i < Math.max(left.length, right.length); i++) {
+      if ((left[i] || 0) !== (right[i] || 0)) return (left[i] || 0) - (right[i] || 0);
+    }
+    return 0;
+  }
+
+  function hasScriptUpdate() {
+    return latestScriptVersion && compareVersions(latestScriptVersion, currentScriptVersion()) > 0;
+  }
+
+  function renderUpdateStatus() {
+    const status = document.getElementById('li-update-status');
+    const install = document.getElementById('li-install-update');
+    if (status) {
+      status.textContent = hasScriptUpdate()
+        ? `Update ${latestScriptVersion} is available`
+        : (updateCheckMessage || `Installed version ${currentScriptVersion()}`);
+      status.style.color = hasScriptUpdate() ? '#facc15' : '#9ca3af';
+    }
+    if (install) {
+      install.style.display = hasScriptUpdate() ? 'block' : 'none';
+      install.textContent = hasScriptUpdate() ? `Install ${latestScriptVersion}` : 'Install update';
+    }
+    buildChrome();
+  }
+
+  function checkForScriptUpdate(force = false) {
+    if (updateCheckInFlight) return updateCheckInFlight;
+    const lastCheck = Number(GM_getValue(UPDATE_LAST_CHECK_GM_KEY, 0)) || 0;
+    if (!force && Date.now() - lastCheck < UPDATE_CHECK_INTERVAL_MS) {
+      renderUpdateStatus();
+      return Promise.resolve(hasScriptUpdate());
+    }
+
+    updateCheckMessage = 'Checking for updates…';
+    renderUpdateStatus();
+    updateCheckInFlight = new Promise((resolve) => {
+      GM_xmlhttpRequest({
+        method: 'GET',
+        url: `${SCRIPT_UPDATE_URL}?check=${Date.now()}`,
+        onload: (response) => {
+          const match = response.status >= 200 && response.status < 300
+            ? response.responseText.match(/^\/\/ @version\s+([^\s]+)$/m)
+            : null;
+          if (match) {
+            latestScriptVersion = match[1];
+            GM_setValue(UPDATE_LATEST_GM_KEY, latestScriptVersion);
+            GM_setValue(UPDATE_LAST_CHECK_GM_KEY, Date.now());
+            updateCheckMessage = hasScriptUpdate() ? '' : `Up to date · ${currentScriptVersion()}`;
+          } else {
+            updateCheckMessage = 'Could not verify the latest version';
+          }
+          resolve(hasScriptUpdate());
+        },
+        onerror: () => { updateCheckMessage = 'Update check failed'; resolve(false); },
+        ontimeout: () => { updateCheckMessage = 'Update check timed out'; resolve(false); },
+        timeout: 15000,
+      });
+    }).finally(() => {
+      updateCheckInFlight = null;
+      renderUpdateStatus();
+    });
+    return updateCheckInFlight;
+  }
 
   // ---------- React fiber reading ----------
 
@@ -1492,6 +1576,14 @@
     tools.id = 'legionnaire-insights-tools';
     tools.className = 'li-pane';
     tools.innerHTML = `
+      <div style="padding-bottom:8px; margin-bottom:8px; border-bottom:1px solid #333;">
+        <b style="color:#4ade80">Script updates</b>
+        <div id="li-update-status" style="margin:4px 0; font-size:10px; color:#9ca3af;">Installed version ${currentScriptVersion()}</div>
+        <div style="display:flex; gap:4px;">
+          <button id="li-check-update" style="flex:1; background:#222; color:#e5e7eb; border:1px solid #444; border-radius:4px; padding:4px; font:10px monospace; cursor:pointer;">Check now</button>
+          <a id="li-install-update" href="${SCRIPT_UPDATE_URL}" target="_blank" rel="noopener noreferrer" style="display:none; flex:1; background:#facc15; color:#211900; border-radius:4px; padding:4px; font:bold 10px monospace; text-align:center; text-decoration:none;">Install update</a>
+        </div>
+      </div>
       <b style="color:#4ade80">Seed Finder</b><br>
       <div style="display:flex; gap:4px; margin:4px 0; flex-wrap:wrap;">
         <input id="li-targetpot" type="number" placeholder="potential" value="94" title="Target potential (exact)" style="width:56px; background:#0e0e12; color:#e5e7eb; border:1px solid #444; border-radius:4px; font:10px monospace;">
@@ -1529,9 +1621,13 @@
     panel.appendChild(agents);
 
     tools.querySelector('#li-search').addEventListener('click', () => runSeedSearch());
+    tools.querySelector('#li-check-update').addEventListener('click', () => checkForScriptUpdate(true));
     tools.querySelector('#li-export').addEventListener('click', () => doExport());
     tools.querySelector('#li-import').addEventListener('click', () => doImport());
-    tools.querySelector('#li-cloud-sync').addEventListener('click', () => cloudSyncNow());
+    tools.querySelector('#li-cloud-sync').addEventListener('click', () => {
+      checkForScriptUpdate(true);
+      cloudSyncNow();
+    });
     const autoSyncToggle = tools.querySelector('#li-auto-sync');
     autoSyncToggle.checked = isAutoSyncEnabled();
     autoSyncToggle.addEventListener('change', () => {
@@ -1635,6 +1731,17 @@
     title.style.color = '#4ade80';
     title.textContent = mode === 'compact' ? 'LI' : 'Legionnaire Insights';
     header.appendChild(title);
+
+    if (hasScriptUpdate()) {
+      const updateLink = document.createElement('a');
+      updateLink.href = SCRIPT_UPDATE_URL;
+      updateLink.target = '_blank';
+      updateLink.rel = 'noopener noreferrer';
+      updateLink.textContent = `↑ ${latestScriptVersion}`;
+      updateLink.title = `Install Legionnaire Insights ${latestScriptVersion}`;
+      updateLink.style.cssText = 'margin-left:auto; margin-right:8px; color:#facc15; font-weight:bold; text-decoration:none;';
+      header.appendChild(updateLink);
+    }
 
     const btns = document.createElement('div');
     btns.style.cssText = 'display:flex; gap:4px;';
@@ -1764,6 +1871,11 @@
   loadClubsDb();
   window.addEventListener('load', () => loadClubsDb());
   buildChrome();
+  renderUpdateStatus();
+  setTimeout(() => checkForScriptUpdate(), 1200);
+  document.addEventListener('visibilitychange', () => {
+    if (document.visibilityState === 'visible') checkForScriptUpdate();
+  });
   maybeAutoContinue();
   initAutoSync();
   setInterval(render, 700);
