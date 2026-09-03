@@ -11,6 +11,7 @@
 - Migrated the GitHub token from page `localStorage` to Tampermonkey-private storage.
 - Retained one-time import compatibility with the v6.15 chunk format.
 - Removed the obsolete in-script Gist publisher and moved long historical comments out of runtime source.
+- Added dependency-free GitHub Actions validation for JavaScript syntax and Tampermonkey metadata.
 
 ## 6.15 — legacy baseline
 
