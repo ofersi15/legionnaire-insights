@@ -1,0 +1,29 @@
+name: Validate userscript
+
+on:
+  push:
+    paths:
+      - legionnaire-insights.user.js
+      - .github/workflows/validate.yml
+  pull_request:
+    paths:
+      - legionnaire-insights.user.js
+      - .github/workflows/validate.yml
+
+jobs:
+  validate:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+      - name: Check JavaScript syntax
+        run: node --check legionnaire-insights.user.js
+      - name: Check Tampermonkey metadata
+        shell: bash
+        run: |
+          grep -Eq '^// @version[[:space:]]+[0-9]+\.[0-9]+' legionnaire-insights.user.js
+          grep -Fq '// @namespace    legionnaire-insights' legionnaire-insights.user.js
+          grep -Fq '// @updateURL    https://raw.githubusercontent.com/ofersi15/legionnaire-insights/main/legionnaire-insights.user.js' legionnaire-insights.user.js
+          grep -Fq '// @downloadURL  https://raw.githubusercontent.com/ofersi15/legionnaire-insights/main/legionnaire-insights.user.js' legionnaire-insights.user.js
