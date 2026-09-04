@@ -1,5 +1,21 @@
 # Changelog
 
+## 7.8.0 - 2026-09-04
+
+- Removed the brittle OVR-tile integration entirely. POT now lives in a tiny draggable floating `LI · POT NN` HUD, so it is always visible and the quick menu has one reliable click target independent of the game's DOM structure.
+- Added a narrow pre-core performance gate for the frozen 7.2 panel render loop. The old core still called `render()` every 700ms and walked the full React tree even while hidden; 7.8 lets that callback run only while the secondary panel is actually visible.
+- Replaced the 7.6/7.7 native runtime stack with one 7.8 runtime. Normal gameplay has no native full-React scan, no root MutationObserver and no broad OVR click heuristics.
+- Made the HUD draggable on touch/mouse and persist its position. When LI is hidden, a small translucent `LI` restore button remains in the top-left.
+- Made the legacy compact panel floating/draggable when it is explicitly opened and persist its position.
+- Club annotations now show only `OVR NN`; tier labels were removed. Club data is cached in localStorage after the first live-bundle parse, and short refresh bursts after clicks/save changes make later transfer screens annotate much faster without continuous DOM polling.
+- Kept strongest-offer outlining and native Seed Finder. Seed search remains isolated in a Web Worker.
+- Kept the v7.2 sync/update implementation unchanged; only its hidden-panel UI polling is gated externally.
+
+## 7.7.0 - 2026-09-04
+
+- Added a small compatibility patch attempting to improve OVR targeting, strip tier text from visible club badges, accelerate post-click refreshes and make compact mode draggable.
+- Superseded by 7.8 after real-device testing showed the OVR-target approach was still unreliable and the frozen core's hidden 700ms React scan remained a major source of intermittent jank.
+
 ## 7.6.0 - 2026-09-03
 
 - Removed the broad root `MutationObserver` from the native UI. Presentation now refreshes primarily when the active save changes, with a 12-second recovery refresh and visibility refresh; this avoids rescanning the whole visible DOM after every React subtree mutation on Firefox Android.
@@ -28,7 +44,7 @@
 - Added a `מצא סיד לקריירה חדשה` entry beside the game's new-career control when that screen is visible.
 - Added full native-UI hiding: club annotations, strongest-club outline, LI chip, seed entry and the legacy launcher disappear. Tapping the player's top OVR restores LI; Alt+L and an invisible long-press gesture in the page's top-left corner are fallbacks.
 - Kept the v7.2 sync/update core unchanged and left v7.3 responsible for the proven club-card annotations; v7.4 is a presentation/workflow patch layered after it.
-- Passed `node --check` locally for the 7.4 runtime and deployable userscript; validation workflow now checks every runtime JavaScript file as well as the wrapper metadata.
+- Passed JavaScript syntax checks for the 7.4 runtime and deployable userscript; validation workflow now checks every runtime JavaScript file as well as the wrapper metadata.
 
 ## 7.3.0 - 2026-09-03
 
