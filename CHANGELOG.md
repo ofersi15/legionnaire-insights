@@ -1,5 +1,19 @@
 # Changelog
 
+## 8.0.0 - 2026-09-04
+
+- Rewrote the deployable userscript runtime from scratch as one `runtime/legionnaire-insights-8.0.0.js`; the active install no longer loads the legacy 7.2 core, performance gate, native-ui patches or diagnostics patch stack.
+- Removed all gameplay polling and all React-fiber scanning. The v8 runtime contains no `setInterval`, no `MutationObserver` and no `__reactFiber` access.
+- Rebuilt the floating `LI · POT NN` HUD with the preferred mobile default placement, persistent dragging and reliable tap-to-open behavior. Outside an actual career screen it shows only `LI`; stale save data no longer exposes a fake POT.
+- Replaced the brittle career detector with a save + visible OVR-tile check that does not require the `OVR` label to be a leaf DOM node.
+- Kept club-choice annotations lightweight and event-driven: only `OVR NN` is shown, strongest visible offer is outlined, and cached club data is reused. Two short post-interaction passes replace continuous scanning.
+- Replaced the old 7.2 panel with one mobile-first bottom sheet containing Details, Seed Finder, Agents and Sync/Settings. Agent preferred clubs resolve to names rather than raw IDs.
+- Preserved the v7 sync snapshot schema (`schema: 3`, `__legSync: 2`), per-device snapshot filenames, gzip/base64 transport, SHA-256 validation, per-device ledgers, career-history union and same-seed active-save advancement.
+- Changed sync scheduling fundamentally: one pull at the start of a tab session, an optional pull after returning to a tab only when 30+ minutes have elapsed, a push after a confirmed retirement/career completion, and explicit manual Sync. There is no localStorage fingerprint loop and no three-minute periodic sync during gameplay.
+- Retirement sync is push-only to the current device's independent snapshot file, so finishing a career does not require reading every remote snapshot first.
+- Kept manual Export/Import and the dormant v6.15 cloud-import fallback for migration safety.
+- Added v8 sync compatibility tests for compression round-trip, checksum rejection, idempotent repeated ledger merge, independent device filenames, career-history union and same-seed advancement. CI also enforces the one-runtime/no-polling/no-React-scan architecture.
+
 ## 7.10.0 - 2026-09-04
 
 - Added low-overhead in-memory performance diagnostics for real-device Firefox Android testing. The collector records event-loop stalls, legacy core React-render duration, local-state fingerprint duration and club-DOM scan duration; it never records save contents, tokens, Gist payloads or device IDs.
