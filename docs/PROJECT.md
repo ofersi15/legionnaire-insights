@@ -3,7 +3,7 @@
 ## Current state
 
 - Userscript: `legionnaire-insights.user.js`
-- Current release: `8.0.3`
+- Current release: `8.0.4`
 - Target: `https://www.legionnaire.xyz/*`
 - Desktop: Chrome; mobile: Firefox Android; both use Tampermonkey.
 - Code delivery: public GitHub raw URL in `@updateURL` and `@downloadURL`.
@@ -23,6 +23,7 @@ The game is a React SPA with no account/backend. Saves are event-sourced in orig
 - Club-choice cards show only `OVR NN`, with the strongest visible offer outlined. Tier text is intentionally omitted.
 - Club data is cached locally after the first live-bundle parse. Full and short club names are indexed so cards can match either form; agent preferred-club IDs resolve to names from the same cache.
 - Club annotation is incremental and normally uses sparse post-interaction retries over 2.4 seconds. Firefox Android can render transfer cards after that window, so the wrapper arms one bounded late refresh after the user becomes idle and one final recovery only if no LI club badge appeared. There is no continuous observer or interval.
+- End-of-cycle screens can contain exactly one club offer beside Retirement. Because the runtime only compares 2+ offers, the wrapper has a narrow cached-club fallback that annotates exactly one club with `OVR NN` without applying a “strongest” outline.
 - Seed search uses a Web Worker and can apply a chosen seed by rebuilding the actually detected active-save key and reloading.
 - LI can be hidden completely; a low-opacity `LI` launcher remains at the saved HUD position for restoration.
 - Manual Export/Import remains available as a fallback.
@@ -40,13 +41,13 @@ V8 is intentionally event-driven:
 
 - no `setInterval` during gameplay;
 - no root `MutationObserver`;
-- no React-fiber scanning;
+- no React-fiber scanning in the deployed v8 runtime;
 - no localStorage fingerprint loop;
 - no periodic three-minute cloud sync.
 
 HUD/club UI refreshes after real user interaction, visibility changes, resize, a short startup burst and the bounded late club recovery described above. There is no continuous gameplay watcher.
 
-The deployable wrapper contains only two small bridges around the single runtime: Tampermonkey update handoff and the bounded late club refresh. Feature/state/sync logic remains in the runtime.
+The deployable wrapper contains only small compatibility bridges around the single runtime: Tampermonkey update handoff plus bounded recovery for late/single-club cards. Feature/state/sync logic remains in the runtime.
 
 ## Important game keys
 
@@ -109,10 +110,13 @@ GitHub Actions runs:
 5. Commit deployable files to `main`.
 6. Confirm GitHub Actions validation and read back the wrapper header.
 
+## Probabilistic-decision research
+
+Legacy live decision props expose a `decision` object together with an interactive `onChoose` callback. Options can contain multiple `outcomes`, each carrying `probability`, `resultLabel` and `effects`; the roll occurs when the option is chosen. The intended deterministic-outcome design is targeted and opt-in: locate only the live probabilistic decision, keep normal random selection as the default, and pass the chosen outcome through the game's existing choice path if that can be validated. Do not globally patch `Math.random`.
+
 ## Near-term work
 
-- Real-device validation that active football careers show POT while home/new-career screens keep it hidden.
-- Verify `OVR NN` annotations appear automatically across several transfer screens without requiring an extra touch after React finishes rendering the cards.
+- Validate the 8.0.4 one-club OVR fallback on the end-of-cycle screen.
 - Verify retirement-triggered push on both normal and confirmation-dialog retirement flows.
 - Verify startup pull and manual Sync between both real devices with existing v7 snapshots.
-- Inspect the game's probabilistic decision handler before implementing deterministic outcome selection; never globally patch randomness.
+- Validate the probabilistic decision handler on a real game session, then integrate a compact outcome selector only on options that actually have multiple outcomes.
