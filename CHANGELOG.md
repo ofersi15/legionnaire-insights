@@ -1,5 +1,16 @@
 # Changelog
 
+## 7.5.0 - 2026-09-03
+
+- Replaced the stacked 7.3 + 7.4 native UI runtimes with one low-overhead 7.5 runtime. The previous combination continuously walked the full React fiber tree from two separate timers and repeatedly scanned/mutated the DOM, which could make Firefox Android noticeably slow.
+- Removed all always-on full React-tree polling from the native UI. POT/development are derived from the active save seed, current OVR is read from the visible OVR tile, and club annotations are discovered from visible clickable club names. The frozen 7.2 core still reads live React state only when its on-demand panel is opened.
+- Stopped injecting probability/outcome pills into generic decision buttons. Those extra children changed the buttons' intrinsic width/height and caused the clipped/overflowing decision cards seen on mobile.
+- Changed transfer club metadata to absolute `::after` badges driven by data attributes, so T/OVR/strongest markers no longer add any height or width to the game's choice cards. This keeps the national-team row and lower transfer CTA from being pushed by LI content.
+- Moved the persistent POT display into the existing OVR tile as a tiny absolute label. Tapping the OVR still opens the LI quick menu; when LI is fully hidden, the same OVR area restores it. Alt+L remains a desktop fallback.
+- Kept the native Seed Finder, but moved the expensive seed search to a Web Worker when supported. The fallback uses small idle-time batches instead of long main-thread bursts, so searching should not freeze gameplay.
+- Preserved the v7.2 sync/update runtime unchanged. The deployable userscript now requires only `legionnaire-insights-core-7.2.0.js` and `native-ui-7.5.0.js`; old 7.3/7.4 UI files remain in Git history/repository but are no longer executed.
+- Passed `node --check` locally for the new 7.5 runtime. GitHub Actions validates the wrapper and every runtime JavaScript file.
+
 ## 7.4.0 - 2026-09-03
 
 - Removed the tall 7.3 Potential/Tools row from the transfer-window layout and replaced it with a compact absolute LI/POT chip in the transfer header, so Legionnaire Insights no longer adds vertical height that can cover the national-team row or push the lower transfer CTA below the mobile viewport.
