@@ -3,7 +3,7 @@
 ## Current state
 
 - Userscript: `legionnaire-insights.user.js`
-- Current release: `7.10.0`
+- Current release: `8.0.0`
 - Target: `https://www.legionnaire.xyz/*`
 - Desktop: Chrome; mobile: Firefox Android; both use Tampermonkey.
 - Code delivery: public GitHub raw URL in `@updateURL` and `@downloadURL`.
@@ -13,41 +13,43 @@ The game is a React SPA with no account/backend. Saves are event-sourced in orig
 
 ## Features
 
-- Fixed career POT is derived from the active seed and shown in a tiny draggable floating `LI · POT` HUD only while a real career/player UI is visible.
-- Outside an active career, LI shows only a small launcher; stale save data must never expose a fake/random POT on the home/new-career screen.
-- Mobile default HUD position is near the lower-left of the player header (`left: 20px`, `top: 62px`); user dragging persists a custom position.
-- Tapping the HUD opens the quick menu. Full Details/Agents/Tools/Sync remain in the secondary core panel on demand.
-- Club strength is shown only as `OVR NN` on visible transfer-choice cards, with the strongest visible offer outlined. Tier text is intentionally omitted.
-- Club data is cached locally after the first live-bundle parse so later transfer screens can annotate quickly.
-- Native Seed Finder uses a Web Worker and can apply a chosen seed by rebuilding the active save and reloading.
-- LI can be fully hidden; the same small `LI` launcher can restore it.
-- The old compact core panel, if explicitly opened, is floating/draggable with remembered position.
-- Automatic cross-device synchronization plus manual export/import fallback.
-- Hourly version awareness on startup/resume and manual sync.
-- Low-overhead performance diagnostics can be opened by long-pressing the LI HUD for about 0.85s on mobile, or `Alt+D` on desktop.
+- Fixed career POT is derived from the active seed and shown in a tiny draggable `LI · POT NN` HUD while an actual career/player UI is visible.
+- Outside a career screen the HUD shows only `LI`; stale save data must never expose a fake POT.
+- Mobile default HUD position is near the lower-left of the player header (`left: 20px`, `top: 62px`); dragging persists a custom position.
+- Tapping the HUD opens one mobile-first bottom sheet. The legacy 7.2 overlay/panel is no longer loaded.
+- Bottom-sheet sections: player Details, native Seed Finder, Agents, and Sync/Settings.
+- Club-choice cards show only `OVR NN`, with the strongest visible offer outlined. Tier text is intentionally omitted.
+- Club data is cached locally after the first live-bundle parse. Agent preferred-club IDs are resolved to names from that same cache.
+- Seed search uses a Web Worker and can apply a chosen seed by rebuilding the active save and reloading.
+- LI can be hidden completely; a low-opacity `LI` launcher remains at the saved HUD position for restoration.
+- Manual Export/Import remains available as a fallback.
+- Update awareness checks at startup (rate-limited to one hour) and on explicit request.
 
-## Runtime layout
+## Runtime architecture
 
-`legionnaire-insights.user.js` currently `@require`s four runtimes:
+`legionnaire-insights.user.js` now `@require`s exactly one runtime:
 
-- `runtime/perf-gate-7.10.0.js` — gates the two expensive legacy-core polling loops, coalesces the 7.9 four-pass club-decoration burst to two passes, and collects in-memory performance timings/event-loop stalls.
-- `runtime/legionnaire-insights-core-7.2.0.js` — unchanged sync/update implementation plus verbose Details/Agents/Tools panel.
-- `runtime/native-ui-7.9.0.js` — event-driven floating POT HUD, cached club OVR annotations, quick menu, native Seed Finder, hide/restore and compact-panel dragging.
-- `runtime/diagnostics-7.10.0.js` — mobile long-press / desktop `Alt+D` diagnostics viewer with copy/reset controls.
+- `runtime/legionnaire-insights-8.0.0.js`
 
-The 7.3–7.8 native UI runtimes are no longer required or executed. Normal gameplay has no native full React-tree scan, no root MutationObserver, no generic decision-button injection and no continuous native-UI polling.
+The active install does **not** load `legionnaire-insights-core-7.2.0.js`, any `perf-gate-*`, any `native-ui-7.x`, or `diagnostics-7.10.0.js`. Those files remain in repository history only.
 
-The frozen 7.2 core still contains a 700ms React-panel render interval and a 3-second local-change fingerprint interval. The performance gate intercepts only those callbacks before the core loads: hidden-panel React rendering is suppressed; the local-change fingerprint runs after user activity during idle time plus a two-minute safety check. The sync/merge/upload algorithms themselves are unchanged.
+V8 is intentionally event-driven:
 
-Club annotation is event-driven. Cached data is used immediately. 7.9 scheduled four DOM passes after an interaction; 7.10 executes only the 70ms early pass and 500ms recovery pass. This is a deliberate compromise between fast offer badges and mobile main-thread cost.
+- no `setInterval` during gameplay;
+- no root `MutationObserver`;
+- no React-fiber scanning;
+- no localStorage fingerprint loop;
+- no periodic three-minute cloud sync.
 
-Diagnostics are ephemeral and privacy-minimal: the collector stores only timing aggregates, recent timing events, event-loop stall durations, viewport size and DPR. It does not store or export save content, seeds, choices, tokens, Gist payloads or device IDs.
+HUD/club UI refreshes after real user interaction, visibility changes, resize, and a short startup burst. Club DOM passes are cheap and limited to two short post-interaction passes.
+
+POT is computed from the seed and memoized. Career presence is determined by an active save plus a visible OVR tile; the detector does not require the `OVR` label to be a leaf node.
 
 ## Important game keys
 
 | Key suffix | Meaning | Merge rule |
 | --- | --- | --- |
-| `football:save:v2` | Active football career | Same seed: longer `choices`; different seed: keep local |
+| `football:save:v2` | Active football career | Same seed: longer `choices`; different seeds keep local |
 | `basketball:save:v2` | Active basketball career | Same rule |
 | `football:careers:v1` | Completed football careers | Union by `seed` |
 | `basketball:careers:v1` | Basketball history | Union by `seed` |
@@ -57,32 +59,55 @@ Diagnostics are ephemeral and privacy-minimal: the collector stores only timing 
 
 `sport:v1` and `currency:v1` are device UI preferences and are excluded.
 
-## Sync v3
+## Sync v3 compatibility and v8 scheduling
 
-Each browser has a stable random device ID and writes one compressed/checksummed Gist snapshot file. A sync performs one authenticated Gist metadata GET, merges all readable device snapshots locally, and PATCHes only this device's file if its state hash changed. Different active-career seeds never silently overwrite one another.
+V8 preserves the existing cloud data format and merge invariants:
 
-On the first v7 run, if no device snapshot exists, the script imports the seven legacy v6.15 chunk files and publishes the first v3 snapshot. Legacy files remain for compatibility.
+- one file per browser: `legionnaire-device-<deviceId>.snapshot.json`;
+- wrapper schema `3` containing a logical `__legSync: 2` payload;
+- gzip/base64 transport when supported;
+- SHA-256 payload verification;
+- cumulative numbers/maps merge through per-device ledgers;
+- completed-career arrays union by seed;
+- same-seed active saves advance to the longer `choices` list;
+- different active-career seeds never overwrite a local active career automatically;
+- legacy v6.15 seven-file import remains as a fallback if no v3 snapshots exist.
 
-Auto-sync triggers on startup, resume, local changes and every three minutes while visible. In 7.10 the local-change detector no longer hashes all Legionnaire localStorage every three seconds continuously; it runs after user activity during idle time and has a two-minute safety check. Startup/resume may reload once when remote data changed and there was no user interaction during the request.
+Scheduling is deliberately sparse:
+
+1. **Fresh tab/session:** one pull/merge from the cloud, if a token is configured.
+2. **Resume after 30+ minutes:** one pull/merge when the tab becomes visible.
+3. **Retirement/career completion:** one push of this device's snapshot after the retirement action is confirmed by local career/completion state changing.
+4. **Manual Sync:** explicit pull/merge followed by push from Sync/Settings.
+
+There is no background fingerprinting and no automatic sync after ordinary decisions. Retirement push writes only this device's independent snapshot file, so it cannot overwrite another device's file.
 
 ## Authentication
 
-The Gist token requires only **Gists: Read and write**. Tokens live in Tampermonkey-private `GM_*Value`, never page `localStorage`.
+The Gist token requires only **Gists: Read and write**. Tokens live in Tampermonkey-private `GM_*Value`, never page `localStorage`. The v8 runtime retains one-time migration from the old page-local token key.
+
+## Validation
+
+GitHub Actions runs:
+
+- JavaScript syntax checks for wrapper/runtime/tests;
+- Tampermonkey metadata checks;
+- v8 sync compatibility tests covering compression round-trip, checksum rejection, idempotent repeated ledger merge, independent device filenames, career-history union and same-seed advancement;
+- architecture guards requiring exactly one runtime and forbidding `setInterval` / `__reactFiber` in the v8 runtime.
 
 ## Release flow
 
-1. Modify userscript/runtime.
+1. Modify the v8 runtime and/or wrapper.
 2. Increment `@version`.
 3. Run syntax and sync-focused tests.
-4. Update `CHANGELOG.md`; update this file for behavior/architecture changes.
+4. Update `CHANGELOG.md`; update this file for architecture/current-behavior changes.
 5. Commit deployable files to `main`.
-6. Confirm GitHub Actions validation and read back the wrapper header/raw URL.
+6. Confirm GitHub Actions validation and read back the wrapper header.
 
-## Near-term cleanup
+## Near-term work
 
-- Collect a 7.10 diagnostics report after several consecutive mobile decisions, especially after a visible freeze/stutter.
-- Confirm whether remaining stalls correlate with `core-state-fingerprint`, `club-dom-scan`, `core-react-render`, or only generic event-loop lag.
-- Confirm HUD tapping, dragging and stale-POT suppression remain correct in 7.10.
-- Confirm `OVR NN` badges remain fast enough with the two-pass post-interaction schedule.
-- Inspect the game's probabilistic decision handler before implementing deterministic outcome selection; do not globally patch randomness.
-- After both device snapshot files are proven stable, remove dormant v6.15 chunk transport.
+- Real-device validation of 8.0 performance across several full careers on Firefox Android.
+- Verify POT detection on career/home/new-career screens and reliable HUD tap/drag behavior.
+- Verify retirement-triggered push on both normal and confirmation-dialog retirement flows.
+- Verify startup pull and manual Sync between both real devices with existing v7 snapshots.
+- Inspect the game's probabilistic decision handler before implementing deterministic outcome selection; never globally patch randomness.
