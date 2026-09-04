@@ -3,7 +3,7 @@
 ## Current state
 
 - Userscript: `legionnaire-insights.user.js`
-- Current release: `7.4.0`
+- Current release: `7.5.0`
 - Target: `https://www.legionnaire.xyz/*`
 - Desktop: Chrome; mobile: Firefox Android; both use Tampermonkey.
 - Code delivery: public GitHub raw URL in `@updateURL` and `@downloadURL`.
@@ -13,25 +13,27 @@ The game is a React SPA with no account/backend. Saves are event-sourced in orig
 
 ## Features
 
-- Hidden overall, potential, development profile, age and position.
+- Hidden player potential/development plus on-demand verbose player/decision detail.
 - Club name/tier/overall lookup from the live Vite bundle.
-- Agent reference table and probabilistic decision previews.
-- Native decision-card annotations for club tier/overall and strongest visible offer.
-- Zero-layout transfer-header LI/POT chip; verbose details, agents, tools and sync remain on demand.
-- Native Seed Finder with remembered targets, inline results and apply-and-reload; a seed entry is also injected beside the new-career control when available.
-- Full native-UI hide/restore. Hidden mode removes annotations and launchers; the player's top OVR restores LI, with Alt+L / top-left long-press fallbacks.
+- Agent reference table and probabilistic decision previews in the secondary panel.
+- Native club-choice annotations for tier/overall and strongest visible offer without changing card layout.
+- POT/growth shown inside the existing OVR tile; tapping OVR opens the quick menu and restores LI when hidden.
+- Native Seed Finder with remembered targets, inline results, apply-and-reload and a new-career entry point.
 - Automatic cross-device synchronization plus manual export/import fallback.
 - Hourly version awareness on startup/resume and manual sync, with an in-panel install link when GitHub has a newer release.
 
 ## Runtime layout
 
-`legionnaire-insights.user.js` is a small Tampermonkey entry point. It currently `@require`s three repository runtimes:
+`legionnaire-insights.user.js` is a small Tampermonkey entry point. It currently `@require`s two repository runtimes:
 
-- `runtime/legionnaire-insights-core-7.2.0.js` — frozen 7.2 core containing sync, update checks, tools and the secondary panel.
-- `runtime/native-ui-7.3.0.js` — club-choice discovery and annotation against the live game DOM.
-- `runtime/native-ui-7.4.0.js` — mobile layout patch, transfer-header chip, native Seed Finder and hide/restore behavior.
+- `runtime/legionnaire-insights-core-7.2.0.js` — frozen core containing sync, update checks, Seed Finder fallback, verbose details/agents/tools and the secondary panel.
+- `runtime/native-ui-7.5.0.js` — low-overhead in-game presentation, native Seed Finder workflow and hide/restore behavior.
 
-The layered split intentionally keeps sync/update code untouched while native DOM integration is being proven on the real game. The 7.4 layer hides the old 7.3 summary row rather than changing 7.3's working club-card logic.
+The old 7.3 and 7.4 UI runtimes are no longer required or executed. Stacking them caused two independent full React-fiber scans plus repeated DOM scans every ~600–700ms, which was too expensive on Firefox Android and also let injected outcome pills affect the intrinsic size of game buttons.
+
+The 7.5 native runtime avoids full React-tree polling. It derives creation POT/development from the active save seed, reads current OVR from the visible OVR tile, matches visible clickable club names against the live club DB, and updates presentation on debounced DOM/save changes. Club metadata is rendered through absolute pseudo-elements so LI does not add width or height to the game's choice cards. Generic probabilistic decision buttons are not modified.
+
+Seed search uses a Web Worker when available; its fallback uses small idle-time batches so it does not monopolize the game thread.
 
 ## Important game keys
 
@@ -84,8 +86,10 @@ The panel also checks the same raw URL at most hourly (or immediately on a manua
 
 ## Near-term cleanup
 
-- Validate the 7.4 transfer-header chip, restored national-team visibility, bottom transfer CTA and native Seed Finder on Firefox Android.
-- Validate club annotations and hide/restore across desktop and mobile decision screens.
+- Validate 7.5 performance on Firefox Android across several consecutive decision screens and transfer windows.
+- Validate that transfer club badges no longer alter button dimensions and that the national-team row / lower transfer CTA remain visible.
+- Validate native Seed Finder Worker behavior on Firefox Android and fallback behavior where Workers are blocked.
+- Validate club annotations and hide/restore across desktop and mobile.
 - Validate v7 migration and background behavior on both real devices.
 - After both device snapshot files exist and are proven stable, remove the dormant v6.15 chunk transport.
 - If active careers with different seeds must be handed off, add explicit conflict selection; never use silent last-write-wins.
