@@ -1,5 +1,11 @@
 # Changelog
 
+## 8.0.4 - 2026-09-04
+
+- Fixed the end-of-cycle screen where a single club offer appears beside Retirement. The v8 runtime intentionally only compares/annotates 2+ club cards, so the wrapper now adds `OVR NN` to exactly one cached club match without applying a misleading “strongest” outline.
+- The single-club fallback uses the existing v3 club cache and runtime badge attributes/styles; it runs only in the bounded late-recovery path and once after startup, with no interval, observer, React scan or continuous polling.
+- Began targeted reverse-engineering of probabilistic decisions for deterministic outcome selection. Legacy live decision props expose `decision.options[].outcomes` (`probability`, `resultLabel`, `effects`) and a live `onChoose` handler; implementation work will avoid global `Math.random` patching and keep normal random behavior as the default.
+
 ## 8.0.3 - 2026-09-04
 
 - Added a bounded late club-card refresh for Firefox Android cases where React finishes rendering transfer options after the runtime's normal 2.4-second post-interaction burst. The bridge waits for user idle, triggers one extra runtime refresh burst, and performs one final recovery burst only if no LI club badge appeared.
@@ -51,7 +57,7 @@
 - Removed continuous native-UI polling; HUD, club badges and compact-panel positioning refresh from interaction/visibility/resize events instead.
 - Gated the legacy 3-second full-localStorage change detector so it runs after user activity during idle time, with a two-minute safety check.
 - Kept the legacy 700ms React panel render gated behind actual panel visibility.
-- Rebuilt HUD tapping with a 12px drag threshold, changed the mobile default position to `left: 20px; top: 62px`, and suppressed POT outside an actual career UI.
+- Rebuilt HUD tapping with a 12px drag threshold, changed the mobile default position to `left: 20px`, `top: 62px`, and suppressed POT outside an actual career UI.
 - Club annotations show only `OVR NN`; cached club data is reused across transfer screens.
 
 ## 7.8.0 - 2026-09-04
