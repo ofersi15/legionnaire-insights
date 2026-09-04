@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         Legionnaire Insights
 // @namespace    legionnaire-insights
-// @version      8.0.3
+// @version      8.0.4
 // @description  Lightweight event-driven Legionnaire HUD, reliable career detection, club strength, seed tools and sparse conflict-safe cloud sync.
 // @match        https://www.legionnaire.xyz/*
 // @grant        GM_xmlhttpRequest
@@ -21,15 +21,16 @@
 
 // V8 intentionally loads one runtime only. Legacy 7.x core/UI/performance
 // patches remain in repository history but are not executed by the install.
-// The wrapper contains only two tiny compatibility bridges: in-app update
-// handoff to Tampermonkey and one bounded late club-card refresh after React
-// finishes rendering a transfer screen unusually slowly.
+// The wrapper contains only small compatibility bridges: Tampermonkey update
+// handoff and bounded recovery for unusually late/single-club decision cards.
 
 (function () {
   'use strict';
 
   const UPDATE_URL = 'https://raw.githubusercontent.com/ofersi15/legionnaire-insights/main/legionnaire-insights.user.js';
   const CLUB_BADGE_SELECTOR = '[data-li-v8-club-badge]';
+  const CLUB_CARD_SELECTOR = '[data-li-v8-club-card]';
+  const CLUB_CACHE_KEY = 'legionnaire-insights:club-cache-v3';
   let latestPromise = null;
   let lateClubTimer = 0;
   let finalClubTimer = 0;
@@ -95,19 +96,88 @@
     if (!opened) location.assign(url);
   }
 
-  // The core runtime already performs a bounded 2.4s refresh burst after a
-  // real interaction. On Firefox Android some transfer cards appear later than
-  // that. After the user becomes idle we trigger exactly one extra runtime
-  // burst, plus one final recovery burst only if no LI club badge appeared.
-  // No interval, observer or continuous DOM polling is introduced.
+  function norm(value) {
+    return String(value || '').replace(/\s+/g, ' ').trim();
+  }
+
+  function isVisible(el) {
+    if (!el || !(el instanceof Element)) return false;
+    const r = el.getBoundingClientRect();
+    if (r.width < 2 || r.height < 2 || r.bottom < 0 || r.top > innerHeight) return false;
+    const s = getComputedStyle(el);
+    return s.display !== 'none' && s.visibility !== 'hidden' && Number(s.opacity || 1) !== 0;
+  }
+
+  function cachedClubAliases() {
+    try {
+      const cache = JSON.parse(localStorage.getItem(CLUB_CACHE_KEY) || 'null');
+      if (!cache || !Array.isArray(cache.items)) return null;
+      const aliases = new Map();
+      for (const item of cache.items) {
+        if (!item || !Number.isFinite(Number(item.ovr))) continue;
+        for (const raw of [item.name, item.shortName, ...(item.aliases || [])]) {
+          const key = norm(raw);
+          if (key) aliases.set(key, item);
+        }
+      }
+      return aliases.size ? aliases : null;
+    } catch (e) {
+      return null;
+    }
+  }
+
+  // Runtime v8 intentionally treats 2+ club cards as a comparison set. On the
+  // end-of-cycle screen there can be exactly one club offer next to Retirement;
+  // annotate that single club from the already-cached DB without declaring it
+  // "best" or introducing any observer/poller.
+  function decorateSingleClubFallback() {
+    if (document.querySelector(CLUB_BADGE_SELECTOR)) return false;
+    const aliases = cachedClubAliases();
+    if (!aliases) return false;
+
+    const matches = [];
+    for (const card of document.querySelectorAll('button,[role="button"]')) {
+      if (!isVisible(card) || card.closest('[data-li-v8]')) continue;
+      const r = card.getBoundingClientRect();
+      if (r.width < 105 || r.height < 65) continue;
+      let club = null;
+      for (const el of card.querySelectorAll('div,span,strong,h2,h3,h4,p')) {
+        if (el.children.length || el.closest('[data-li-v8]')) continue;
+        club = aliases.get(norm(el.textContent));
+        if (club) break;
+      }
+      if (club) matches.push({ card, club });
+    }
+
+    if (matches.length !== 1) return false;
+    const { card, club } = matches[0];
+    if (getComputedStyle(card).position === 'static') {
+      card.style.position = 'relative';
+      card.dataset.liV8Relative = '1';
+    }
+    card.setAttribute('data-li-v8-club-card', '1');
+    card.classList.remove('li-v8-best');
+    let badge = card.querySelector(':scope > [data-li-v8-club-badge]');
+    if (!badge) {
+      badge = document.createElement('span');
+      badge.setAttribute('data-li-v8-club-badge', '1');
+      badge.setAttribute('data-li-v8', 'badge');
+      card.appendChild(badge);
+    }
+    badge.textContent = `OVR ${Number(club.ovr)}`;
+    return true;
+  }
+
   function kickLateClubRefresh() {
-    if (document.querySelector(CLUB_BADGE_SELECTOR)) return;
-    document.dispatchEvent(new KeyboardEvent('keyup', {
-      key: 'Unidentified',
-      code: 'Unidentified',
-      bubbles: false,
-      cancelable: false,
-    }));
+    if (!document.querySelector(CLUB_BADGE_SELECTOR)) {
+      document.dispatchEvent(new KeyboardEvent('keyup', {
+        key: 'Unidentified',
+        code: 'Unidentified',
+        bubbles: false,
+        cancelable: false,
+      }));
+    }
+    setTimeout(decorateSingleClubFallback, 120);
   }
 
   function armLateClubRefresh() {
@@ -137,8 +207,6 @@
     }
 
     if (target.closest('#legionnaire-insights-v8-sheet [data-update]')) {
-      // Let the runtime perform its normal check/status update, then promote
-      // the same button to an install action if the fetched version is newer.
       setTimeout(() => enhanceUpdateButton(true), 80);
     }
   }, true);
@@ -150,7 +218,7 @@
     armLateClubRefresh();
   }, { passive: true });
 
-  // Cover a direct page load/resume that lands on a transfer screen whose
-  // cards finish rendering after the runtime's startup burst.
+  // Cover direct load/resume and the one-club end-of-cycle screen.
   armLateClubRefresh();
+  setTimeout(decorateSingleClubFallback, 1800);
 })();
