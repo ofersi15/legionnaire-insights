@@ -1,5 +1,16 @@
 # Changelog
 
+## 8.0.1 - 2026-09-04
+
+- Fixed active-career detection on real Firefox Android sessions. V8 now checks the sport-specific save plus the legacy `maslul-kariera:save:v1` fallback instead of assuming the active football save always lives in `football:save:v2`.
+- Hardened the career-screen detector with a rendered-text fallback for React/Firefox layouts where the visible OVR caption is not discoverable as a clean standalone DOM node. POT still requires both a real save and visible career UI, so stale saves on the home screen do not expose a fake POT.
+- Added non-sensitive debug state showing which save key was detected, whether career UI was detected, the OVR source and club-cache size.
+- Reworked club annotations to be incremental instead of removing/recreating every badge on each pass, reducing flicker when React rerenders decision cards.
+- Added club short-name aliases from the live bundle and bumped the club cache format so transfer cards can match either full or short displayed names.
+- Replaced the too-short 80/350ms club refresh pair with sparse adaptive retries across 2.4 seconds. Real-device diagnostics showed a club DOM pass costs about 1–2ms, so these retries improve reliability without bringing back polling or measurable jank.
+- Seed application and retirement detection now use the actually detected active-save key, including the legacy football save key when present.
+- Kept the single-runtime v8 architecture, sparse sync schedule, v7-compatible snapshot format and no-`setInterval` / no-React-scan guarantees.
+
 ## 8.0.0 - 2026-09-04
 
 - Rewrote the deployable userscript runtime from scratch as one `runtime/legionnaire-insights-8.0.0.js`; the active install no longer loads the legacy 7.2 core, performance gate, native-ui patches or diagnostics patch stack.
