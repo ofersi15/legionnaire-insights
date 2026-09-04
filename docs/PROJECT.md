@@ -3,7 +3,7 @@
 ## Current state
 
 - Userscript: `legionnaire-insights.user.js`
-- Current release: `7.6.0`
+- Current release: `7.8.0`
 - Target: `https://www.legionnaire.xyz/*`
 - Desktop: Chrome; mobile: Firefox Android; both use Tampermonkey.
 - Code delivery: public GitHub raw URL in `@updateURL` and `@downloadURL`.
@@ -13,29 +13,27 @@ The game is a React SPA with no account/backend. Saves are event-sourced in orig
 
 ## Features
 
-- Hidden player potential/development plus on-demand verbose player/decision detail.
-- Club name/tier/overall lookup from the live Vite bundle.
-- Agent reference table and probabilistic decision previews in the secondary panel.
-- Native club-choice annotations for tier/overall and strongest visible offer without changing card layout.
-- Fixed career POT shown inside the existing OVR tile; only that exact tile opens/restores the LI quick menu.
-- Native Seed Finder with remembered targets, inline results, apply-and-reload and a new-career entry point.
+- Fixed career POT is derived from the active seed and shown in a tiny draggable floating `LI · POT` HUD.
+- Tapping the HUD opens the quick menu; full Details/Agents/Tools/Sync remain in the secondary core panel on demand.
+- Club strength is shown only as `OVR NN` on visible transfer-choice cards, with the strongest visible offer outlined. Tier text is intentionally omitted.
+- Club data is cached locally after the first live-bundle parse so later transfer screens can annotate immediately.
+- Native Seed Finder uses a Web Worker and can apply a chosen seed by rebuilding the active save and reloading.
+- LI can be fully hidden; a small low-opacity `LI` restore button remains in the top-left.
+- The old compact core panel, if explicitly opened, is forced to floating positioning and is draggable with remembered position.
 - Automatic cross-device synchronization plus manual export/import fallback.
 - Hourly version awareness on startup/resume and manual sync, with an in-panel install link when GitHub has a newer release.
 
 ## Runtime layout
 
-`legionnaire-insights.user.js` is a small Tampermonkey entry point. It currently `@require`s two repository runtimes:
+`legionnaire-insights.user.js` currently `@require`s three runtimes:
 
-- `runtime/legionnaire-insights-core-7.2.0.js` — frozen core containing sync, update checks, Seed Finder fallback, verbose details/agents/tools and the secondary panel.
-- `runtime/native-ui-7.6.0.js` — low-overhead in-game presentation, native Seed Finder workflow and hide/restore behavior.
+- `runtime/perf-gate-7.8.0.js` — narrowly intercepts only the frozen core's `setInterval(render, 700)` loop. The callback runs every 1.5s only while the secondary panel is actually visible, eliminating hidden-panel React-tree scans during normal gameplay.
+- `runtime/legionnaire-insights-core-7.2.0.js` — unchanged sync/update implementation plus verbose Details/Agents/Tools panel.
+- `runtime/native-ui-7.8.0.js` — floating POT HUD, cached club OVR annotations, quick menu, native Seed Finder, hide/restore and compact-panel dragging.
 
-The old 7.3, 7.4 and 7.5 UI runtimes are no longer required or executed. 7.6 removes the 7.5 root `MutationObserver`; presentation refreshes primarily when the active save changes, plus visibility and a 12-second recovery refresh. This avoids rescanning the DOM after every React subtree mutation on Firefox Android.
+The 7.3–7.7 native UI runtimes are no longer required or executed. In particular, the brittle attempt to find/inject into the game's OVR tile was removed. Normal gameplay now has no full React-tree scan from native UI, no root MutationObserver, and no generic decision-button injection.
 
-POT/development are derived from the active career seed; POT is fixed for the career. Current OVR is read from the compact visible OVR tile. The quick-menu listener is attached directly to that exact tile rather than using a delegated ancestor heuristic.
-
-Club choices are matched by visible club-name text against the live club DB only during a refresh. Metadata is rendered as short absolutely positioned DOM badges (`T1 · 84`) and strongest-club outlining; injected nodes remain out of flow and must not change card dimensions. Generic probabilistic decision buttons are not modified.
-
-Seed search uses a Web Worker when available; its fallback uses small idle-time batches so it does not monopolize the game thread.
+Club annotation is event-driven: cached data is used immediately, and short refresh bursts run after user actions or active-save changes. The expensive game bundle is reparsed only when its hashed script URL changes.
 
 ## Important game keys
 
@@ -57,42 +55,29 @@ Each browser has a stable random device ID. It writes one Gist file named:
 
 `legionnaire-device-<deviceId>.snapshot.json`
 
-The file wraps the existing logical `__legSync: 2` payload with:
+The file wraps the existing logical `__legSync: 2` payload with schema/device metadata, update timestamp, state hash, gzip/base64 payload and SHA-256 verification. A sync performs one authenticated Gist metadata GET, merges all device snapshots locally, and PATCHes only this device's file if its state hash changed. Different active-career seeds never silently overwrite one another.
 
-- schema version and device ID;
-- update timestamp and state hash;
-- gzip-compressed, base64-encoded payload;
-- SHA-256 payload checksum.
-
-A sync performs one authenticated Gist metadata GET, decodes all device snapshots, merges them locally, and PATCHes only this device's file if the state hash changed. Independent files remove last-writer collisions. Compression avoids the Firefox-Android bridge truncation previously observed near 944KB.
-
-On the first v7 run, if no device snapshot exists, the script reads the seven legacy v6.15 chunk files, merges them and publishes the first v3 snapshot. Legacy files are not deleted automatically.
+On the first v7 run, if no device snapshot exists, the script imports the seven legacy v6.15 chunk files and publishes the first v3 snapshot. Legacy files remain for compatibility.
 
 Auto-sync triggers on startup, resume, five seconds after detected local changes, and every three minutes while visible. Startup/resume may reload once when remote data changed and there was no user interaction during the request.
 
 ## Authentication
 
-The Gist token requires only **Gists: Read and write**. v7 migrates the old `legionnaire-insights:gh-token` value from page `localStorage` into Tampermonkey-private `GM_setValue` storage, then removes the old value.
+The Gist token requires only **Gists: Read and write**. Tokens live in Tampermonkey-private `GM_*Value`, never page `localStorage`.
 
 ## Release flow
 
-1. Modify the userscript/runtime.
+1. Modify userscript/runtime.
 2. Increment `@version`.
 3. Run syntax and sync-focused tests.
-4. Update `CHANGELOG.md`; update this file only for architectural changes.
-5. Commit the deployable file to `main`.
-6. Confirm the GitHub Actions validation and read back the file header/raw URL.
-
-Tampermonkey detects a higher `@version` from the raw URL. Script Sync may additionally be enabled in Tampermonkey on both browsers, but it is not used for game-save data.
-The panel also checks the same raw URL at most hourly (or immediately on a manual check/sync). It can surface and open an update, but Tampermonkey remains responsible for installing it.
+4. Update `CHANGELOG.md`; update this file for behavior/architecture changes.
+5. Commit deployable files to `main`.
+6. Confirm GitHub Actions validation and read back the wrapper header/raw URL.
 
 ## Near-term cleanup
 
-- Validate 7.6 performance on Firefox Android across several consecutive decision screens and transfer windows.
-- Validate that POT is visible inside the exact OVR tile and that only that tile opens LI.
-- Validate short club badges on narrow three-card mobile layouts.
-- Inspect the live probabilistic decision handler before implementing any deterministic/forced outcome control; preserve the game's own save/event format rather than globally patching randomness.
-- Validate native Seed Finder Worker behavior on Firefox Android and fallback behavior where Workers are blocked.
-- Validate v7 migration and background behavior on both real devices.
-- After both device snapshot files exist and are proven stable, remove the dormant v6.15 chunk transport.
-- If active careers with different seeds must be handed off, add explicit conflict selection; never use silent last-write-wins.
+- Validate 7.8 performance on Firefox Android over several consecutive decision screens.
+- Confirm cached `OVR NN` badges appear effectively immediately on subsequent transfer windows.
+- Validate draggable HUD and compact secondary panel on mobile and desktop.
+- Inspect the game's probabilistic decision handler before implementing deterministic outcome selection; do not globally patch randomness.
+- After both device snapshot files are proven stable, remove dormant v6.15 chunk transport.
