@@ -1,5 +1,13 @@
 # Changelog
 
+## 8.1.0 - 2026-09-04
+
+- Added a responsive desktop toolbar inside the player card, immediately above the trophy case: `POT NN · gap`, Details, Seed Finder and Tools / Sync. It is 30px tall, does not float over the decision area and is not draggable.
+- Kept the existing tiny draggable `LI · POT NN` HUD on mobile and coarse-pointer layouts. The layout switches at the tested 900px/fine-pointer boundary and coalesces resize work through one animation frame.
+- Validated the active game bundle and live careers before attempting deterministic outcomes. The current `onChoose` accepts only an option ID, finds the original option in pending state, and rolls through the seeded game RNG. Saves persist only choice IDs, so Candidate A/B object clones cannot reach the current handler and a transient outcome override would not survive replay after refresh.
+- Kept deterministic-outcome forcing out of the deployed runtime. There is still no global RNG patch, interval, root observer or React-tree scan.
+- Browser validation covered 1920×1080, 1440×900, 1024×768, 450×875 and 412×915 with no horizontal overflow; toolbar actions and the mobile HUD were exercised in a runtime harness.
+
 ## 8.0.4 - 2026-09-04
 
 - Fixed the end-of-cycle screen where a single club offer appears beside Retirement. The v8 runtime intentionally only compares/annotates 2+ club cards, so the wrapper now adds `OVR NN` to exactly one cached club match without applying a misleading “strongest” outline.

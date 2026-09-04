@@ -1,6 +1,8 @@
 'use strict';
 
 const assert = require('node:assert/strict');
+const fs = require('node:fs');
+const path = require('node:path');
 
 class StorageMock {
   constructor() { this.map = new Map(); }
@@ -52,5 +54,25 @@ assert.equal(activeSaveRecord('basketball').key, BASKETBALL, 'basketball should 
 storage.clear();
 storage.setItem(LEGACY, JSON.stringify({ choices: [] }));
 assert.equal(activeSaveRecord('football'), null, 'a stale object without a seed is not an active save');
+
+const runtimePath = path.join(__dirname, '..', 'runtime', 'legionnaire-insights-8.1.0.js');
+const runtime = fs.readFileSync(runtimePath, 'utf8');
+const breakpointMatch = runtime.match(/const DESKTOP_MIN_WIDTH = (\d+);/);
+assert.ok(breakpointMatch, 'desktop breakpoint must be explicit and testable');
+const desktopMinWidth = Number(breakpointMatch[1]);
+const desktopLayout = (width, finePointer) => width >= desktopMinWidth && finePointer;
+
+assert.equal(desktopLayout(1920, true), true, '1920px fine-pointer viewport uses the desktop toolbar');
+assert.equal(desktopLayout(1440, true), true, '1440px fine-pointer viewport uses the desktop toolbar');
+assert.equal(desktopLayout(1024, true), true, 'narrow laptop viewport keeps the desktop toolbar');
+assert.equal(desktopLayout(450, true), false, '450px viewport keeps the mobile HUD');
+assert.equal(desktopLayout(412, true), false, 'common Android viewport keeps the mobile HUD');
+assert.equal(desktopLayout(1200, false), false, 'large coarse-pointer devices keep the draggable HUD');
+assert.match(runtime, /data-toolbar-action="details"/, 'desktop toolbar exposes Details');
+assert.match(runtime, /data-toolbar-action="seed"/, 'desktop toolbar exposes Seed Finder');
+assert.match(runtime, /data-toolbar-action="main"/, 'desktop toolbar exposes tools and Sync');
+assert.match(runtime, /toolbarAnchor\.insertBefore\(hud, trophyCase \|\| null\)/, 'toolbar is inserted inside the player card before the trophy case');
+assert.doesNotMatch(runtime, /setInterval/, 'deployed runtime must not poll');
+assert.doesNotMatch(runtime, /__reactFiber/, 'deployed runtime must not scan React fibers');
 
 console.log('v8 UI logic tests: OK');

@@ -3,7 +3,7 @@
 ## Current state
 
 - Userscript: `legionnaire-insights.user.js`
-- Current release: `8.0.4`
+- Current release: `8.1.0`
 - Target: `https://www.legionnaire.xyz/*`
 - Desktop: Chrome; mobile: Firefox Android; both use Tampermonkey.
 - Code delivery: public GitHub raw URL in `@updateURL` and `@downloadURL`.
@@ -13,7 +13,7 @@ The game is a React SPA with no account/backend. Saves are event-sourced in orig
 
 ## Features
 
-- Fixed career POT is derived from the active seed and shown in a tiny draggable `LI · POT NN` HUD while an actual career/player UI is visible.
+- Fixed career POT is derived from the active seed. Mobile/coarse-pointer layouts use the tiny draggable `LI · POT NN` HUD; desktop uses a 30px toolbar inside the player card with POT/gap, Details, Seed Finder and Tools / Sync.
 - Active-save lookup checks the sport-specific v2 save first, then the legacy `maslul-kariera:save:v1` fallback used by real football sessions, then the other sport save as a final compatibility fallback.
 - Career-screen detection prefers a visible OVR tile and falls back to rendered career text on Firefox/React layouts where the OVR caption is not cleanly discoverable in the DOM. A save alone is never enough to show POT.
 - Outside a career screen the HUD shows only `LI`; stale save data must never expose a fake POT.
@@ -33,7 +33,7 @@ The game is a React SPA with no account/backend. Saves are event-sourced in orig
 
 `legionnaire-insights.user.js` `@require`s exactly one runtime:
 
-- `runtime/legionnaire-insights-8.0.1.js`
+- `runtime/legionnaire-insights-8.1.0.js`
 
 The active install does **not** load `legionnaire-insights-core-7.2.0.js`, any `perf-gate-*`, any `native-ui-7.x`, or `diagnostics-7.10.0.js`. Those files remain in repository history only.
 
@@ -45,7 +45,7 @@ V8 is intentionally event-driven:
 - no localStorage fingerprint loop;
 - no periodic three-minute cloud sync.
 
-HUD/club UI refreshes after real user interaction, visibility changes, resize, a short startup burst and the bounded late club recovery described above. There is no continuous gameplay watcher.
+HUD/toolbar and club UI refresh after real user interaction, visibility changes, a coalesced resize frame, a short startup burst and the bounded late club recovery described above. There is no continuous gameplay watcher. At 900px+ with a fine pointer, the toolbar is inserted immediately before the player card's trophy case; narrower or coarse-pointer layouts retain the draggable floating HUD.
 
 The deployable wrapper contains only small compatibility bridges around the single runtime: Tampermonkey update handoff plus bounded recovery for late/single-club cards. Feature/state/sync logic remains in the runtime.
 
@@ -101,22 +101,15 @@ GitHub Actions runs:
 - active-save fallback tests for the sport-specific and legacy football save keys;
 - architecture guards requiring exactly one runtime and forbidding `setInterval` / `__reactFiber` in the deployed v8 runtime.
 
-## Release flow
-
-1. Modify the v8 runtime and/or wrapper.
-2. Increment `@version`.
-3. Run syntax and sync-focused tests.
-4. Update `CHANGELOG.md`; update this file for architecture/current-behavior changes.
-5. Commit deployable files to `main`.
-6. Confirm GitHub Actions validation and read back the wrapper header.
-
 ## Probabilistic-decision research
 
-Legacy live decision props expose a `decision` object together with an interactive `onChoose` callback. Options can contain multiple `outcomes`, each carrying `probability`, `resultLabel` and `effects`; the roll occurs when the option is chosen. The intended deterministic-outcome design is targeted and opt-in: locate only the live probabilistic decision, keep normal random selection as the default, and pass the chosen outcome through the game's existing choice path if that can be validated. Do not globally patch `Math.random`.
+The active bundle renders personal cards with `onClick: () => onChoose(option.id)`. The one-argument callback finds the original pending option, derives an RNG from `seed + step + optionId`, and samples its outcomes cumulatively. Saves record only ordered choice IDs and replay outcomes from the seed.
+
+The research branch's option-clone Candidates A/B therefore cannot reach the handler. A transient mutation would not survive refresh. Forcing remains research-only until it has a replay-safe representation without a global RNG patch, continuous React scan or save corruption.
 
 ## Near-term work
 
 - Validate the 8.0.4 one-club OVR fallback on the end-of-cycle screen.
 - Verify retirement-triggered push on both normal and confirmation-dialog retirement flows.
 - Verify startup pull and manual Sync between both real devices with existing v7 snapshots.
-- Validate the probabilistic decision handler on a real game session, then integrate a compact outcome selector only on options that actually have multiple outcomes.
+- Find a replay-safe representation for forced outcomes, then validate it in live careers before integrating any production control.
