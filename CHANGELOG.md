@@ -1,5 +1,16 @@
 # Changelog
 
+## 8.0.3 - 2026-09-04
+
+- Added a bounded late club-card refresh for Firefox Android cases where React finishes rendering transfer options after the runtime's normal 2.4-second post-interaction burst. The bridge waits for user idle, triggers one extra runtime refresh burst, and performs one final recovery burst only if no LI club badge appeared.
+- Kept the no-polling performance model: there is still no interval, MutationObserver, React scan or continuous DOM loop. The late refresh is timeout-bounded and only armed after a real user interaction or initial page load.
+- Kept the 8.0.2 in-app update handoff so a detected newer version becomes an `עדכן ל-X` action that opens Tampermonkey's userscript install/update flow.
+
+## 8.0.2 - 2026-09-04
+
+- Turned the existing update checker into an update handoff: when a newer version is detected, the same control changes to `עדכן ל-X` and opens the raw `.user.js` URL so Tampermonkey can present its normal update/install confirmation screen.
+- This is intentionally a Tampermonkey handoff rather than a self-modifying updater; the userscript never rewrites its own installed source directly.
+
 ## 8.0.1 - 2026-09-04
 
 - Fixed active-career detection on real Firefox Android sessions. V8 now checks the sport-specific save plus the legacy `maslul-kariera:save:v1` fallback instead of assuming the active football save always lives in `football:save:v2`.
