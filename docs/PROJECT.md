@@ -3,7 +3,7 @@
 ## Current state
 
 - Userscript: `legionnaire-insights.user.js`
-- Current release: `8.0.1`
+- Current release: `8.0.3`
 - Target: `https://www.legionnaire.xyz/*`
 - Desktop: Chrome; mobile: Firefox Android; both use Tampermonkey.
 - Code delivery: public GitHub raw URL in `@updateURL` and `@downloadURL`.
@@ -22,11 +22,11 @@ The game is a React SPA with no account/backend. Saves are event-sourced in orig
 - Bottom-sheet sections: player Details, native Seed Finder, Agents, and Sync/Settings.
 - Club-choice cards show only `OVR NN`, with the strongest visible offer outlined. Tier text is intentionally omitted.
 - Club data is cached locally after the first live-bundle parse. Full and short club names are indexed so cards can match either form; agent preferred-club IDs resolve to names from the same cache.
-- Club annotation is incremental and uses sparse post-interaction retries over 2.4 seconds because React may replace decision cards after the initial render. Real-device diagnostics measured a club scan at roughly 1–2ms, so this remains inexpensive without continuous observation.
+- Club annotation is incremental and normally uses sparse post-interaction retries over 2.4 seconds. Firefox Android can render transfer cards after that window, so the wrapper arms one bounded late refresh after the user becomes idle and one final recovery only if no LI club badge appeared. There is no continuous observer or interval.
 - Seed search uses a Web Worker and can apply a chosen seed by rebuilding the actually detected active-save key and reloading.
 - LI can be hidden completely; a low-opacity `LI` launcher remains at the saved HUD position for restoration.
 - Manual Export/Import remains available as a fallback.
-- Update awareness checks at startup (rate-limited to one hour) and on explicit request.
+- Update awareness checks at startup (rate-limited to one hour) and on explicit request. When a newer version is detected, the in-app control changes to `עדכן ל-X` and hands the raw `.user.js` URL to Tampermonkey for its normal update/install confirmation screen.
 
 ## Runtime architecture
 
@@ -44,7 +44,9 @@ V8 is intentionally event-driven:
 - no localStorage fingerprint loop;
 - no periodic three-minute cloud sync.
 
-HUD/club UI refreshes after real user interaction, visibility changes, resize, and a short startup burst. There is no continuous gameplay watcher.
+HUD/club UI refreshes after real user interaction, visibility changes, resize, a short startup burst and the bounded late club recovery described above. There is no continuous gameplay watcher.
+
+The deployable wrapper contains only two small bridges around the single runtime: Tampermonkey update handoff and the bounded late club refresh. Feature/state/sync logic remains in the runtime.
 
 ## Important game keys
 
@@ -109,8 +111,8 @@ GitHub Actions runs:
 
 ## Near-term work
 
-- Real-device validation that 8.0.1 shows POT on active football careers while keeping it hidden on home/new-career screens.
-- Verify `OVR NN` annotations remain present across several transfer screens and delayed React rerenders.
+- Real-device validation that active football careers show POT while home/new-career screens keep it hidden.
+- Verify `OVR NN` annotations appear automatically across several transfer screens without requiring an extra touch after React finishes rendering the cards.
 - Verify retirement-triggered push on both normal and confirmation-dialog retirement flows.
 - Verify startup pull and manual Sync between both real devices with existing v7 snapshots.
 - Inspect the game's probabilistic decision handler before implementing deterministic outcome selection; never globally patch randomness.
