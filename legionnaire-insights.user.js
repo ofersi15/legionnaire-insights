@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         Legionnaire Insights
 // @namespace    legionnaire-insights
-// @version      8.0.2
+// @version      8.0.3
 // @description  Lightweight event-driven Legionnaire HUD, reliable career detection, club strength, seed tools and sparse conflict-safe cloud sync.
 // @match        https://www.legionnaire.xyz/*
 // @grant        GM_xmlhttpRequest
@@ -21,15 +21,18 @@
 
 // V8 intentionally loads one runtime only. Legacy 7.x core/UI/performance
 // patches remain in repository history but are not executed by the install.
-// This tiny wrapper bridge turns the existing "check update" control into an
-// installer link when a newer userscript version is available. The actual
-// feature/runtime logic remains in the single @require above.
+// The wrapper contains only two tiny compatibility bridges: in-app update
+// handoff to Tampermonkey and one bounded late club-card refresh after React
+// finishes rendering a transfer screen unusually slowly.
 
 (function () {
   'use strict';
 
   const UPDATE_URL = 'https://raw.githubusercontent.com/ofersi15/legionnaire-insights/main/legionnaire-insights.user.js';
+  const CLUB_BADGE_SELECTOR = '[data-li-v8-club-badge]';
   let latestPromise = null;
+  let lateClubTimer = 0;
+  let finalClubTimer = 0;
 
   function currentVersion() {
     return (typeof GM_info !== 'undefined' && GM_info.script && GM_info.script.version) || '0.0.0';
@@ -92,6 +95,30 @@
     if (!opened) location.assign(url);
   }
 
+  // The core runtime already performs a bounded 2.4s refresh burst after a
+  // real interaction. On Firefox Android some transfer cards appear later than
+  // that. After the user becomes idle we trigger exactly one extra runtime
+  // burst, plus one final recovery burst only if no LI club badge appeared.
+  // No interval, observer or continuous DOM polling is introduced.
+  function kickLateClubRefresh() {
+    if (document.querySelector(CLUB_BADGE_SELECTOR)) return;
+    document.dispatchEvent(new KeyboardEvent('keyup', {
+      key: 'Unidentified',
+      code: 'Unidentified',
+      bubbles: false,
+      cancelable: false,
+    }));
+  }
+
+  function armLateClubRefresh() {
+    clearTimeout(lateClubTimer);
+    clearTimeout(finalClubTimer);
+    lateClubTimer = setTimeout(() => {
+      kickLateClubRefresh();
+      finalClubTimer = setTimeout(kickLateClubRefresh, 3000);
+    }, 2700);
+  }
+
   document.addEventListener('click', (event) => {
     const target = event.target instanceof Element ? event.target : null;
     if (!target) return;
@@ -115,4 +142,15 @@
       setTimeout(() => enhanceUpdateButton(true), 80);
     }
   }, true);
+
+  document.addEventListener('pointerup', (event) => {
+    if (!event.isTrusted) return;
+    const target = event.target instanceof Element ? event.target : null;
+    if (target && target.closest('[data-li-v8]')) return;
+    armLateClubRefresh();
+  }, { passive: true });
+
+  // Cover a direct page load/resume that lands on a transfer screen whose
+  // cards finish rendering after the runtime's startup burst.
+  armLateClubRefresh();
 })();
