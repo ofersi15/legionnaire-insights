@@ -1,5 +1,14 @@
 # Changelog
 
+## 7.6.0 - 2026-09-03
+
+- Removed the broad root `MutationObserver` from the native UI. Presentation now refreshes primarily when the active save changes, with a 12-second recovery refresh and visibility refresh; this avoids rescanning the whole visible DOM after every React subtree mutation on Firefox Android.
+- Reworked the OVR integration so the LI menu is bound directly to the exact compact OVR tile. The old delegated ancestor heuristic could treat a much larger player/decision container as an OVR target, which is why tapping the lower-right decision/club could open LI.
+- Replaced the POT pseudo-element with a real absolutely positioned `POT NN` child inside the OVR tile. Potential is derived from the career seed and stays fixed for the career.
+- Replaced clipped club pseudo-badges with short absolute DOM badges (`T1 · 84` style), keeping them out of layout while avoiding mobile ellipsis/cutoff.
+- Kept strongest-club outlining, native Seed Finder, full hide/restore, the frozen v7.2 sync/update core and the Web Worker seed search.
+- `native-ui-7.5.0.js` is no longer required by the deployable userscript; 7.6 loads only the frozen 7.2 core plus `native-ui-7.6.0.js`.
+
 ## 7.5.0 - 2026-09-03
 
 - Replaced the stacked 7.3 + 7.4 native UI runtimes with one low-overhead 7.5 runtime. The previous combination continuously walked the full React fiber tree from two separate timers and repeatedly scanned/mutated the DOM, which could make Firefox Android noticeably slow.
