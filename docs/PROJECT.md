@@ -3,7 +3,7 @@
 ## Current state
 
 - Userscript: `legionnaire-insights.user.js`
-- Current release: `7.8.0`
+- Current release: `7.9.0`
 - Target: `https://www.legionnaire.xyz/*`
 - Desktop: Chrome; mobile: Firefox Android; both use Tampermonkey.
 - Code delivery: public GitHub raw URL in `@updateURL` and `@downloadURL`.
@@ -13,12 +13,14 @@ The game is a React SPA with no account/backend. Saves are event-sourced in orig
 
 ## Features
 
-- Fixed career POT is derived from the active seed and shown in a tiny draggable floating `LI · POT` HUD.
-- Tapping the HUD opens the quick menu; full Details/Agents/Tools/Sync remain in the secondary core panel on demand.
+- Fixed career POT is derived from the active seed and shown in a tiny draggable floating `LI · POT` HUD only while a real career/player UI is visible.
+- Outside an active career, LI shows only a small launcher; stale save data must never expose a fake/random POT on the home/new-career screen.
+- Mobile default HUD position is near the lower-left of the player header (`left: 20px`, `top: 62px`); user dragging persists a custom position.
+- Tapping the HUD opens the quick menu. Full Details/Agents/Tools/Sync remain in the secondary core panel on demand.
 - Club strength is shown only as `OVR NN` on visible transfer-choice cards, with the strongest visible offer outlined. Tier text is intentionally omitted.
 - Club data is cached locally after the first live-bundle parse so later transfer screens can annotate immediately.
 - Native Seed Finder uses a Web Worker and can apply a chosen seed by rebuilding the active save and reloading.
-- LI can be fully hidden; a small low-opacity `LI` restore button remains in the top-left.
+- LI can be fully hidden; the same small `LI` launcher can restore it.
 - The old compact core panel, if explicitly opened, is forced to floating positioning and is draggable with remembered position.
 - Automatic cross-device synchronization plus manual export/import fallback.
 - Hourly version awareness on startup/resume and manual sync, with an in-panel install link when GitHub has a newer release.
@@ -27,13 +29,15 @@ The game is a React SPA with no account/backend. Saves are event-sourced in orig
 
 `legionnaire-insights.user.js` currently `@require`s three runtimes:
 
-- `runtime/perf-gate-7.8.0.js` — narrowly intercepts only the frozen core's `setInterval(render, 700)` loop. The callback runs every 1.5s only while the secondary panel is actually visible, eliminating hidden-panel React-tree scans during normal gameplay.
+- `runtime/perf-gate-7.9.0.js` — intercepts only two expensive legacy-core polling loops before the core loads: the 700ms React render loop runs only while the secondary panel is actually visible, and the 3-second full-localStorage change detector is replaced by idle, post-interaction checks plus a two-minute safety check.
 - `runtime/legionnaire-insights-core-7.2.0.js` — unchanged sync/update implementation plus verbose Details/Agents/Tools panel.
-- `runtime/native-ui-7.8.0.js` — floating POT HUD, cached club OVR annotations, quick menu, native Seed Finder, hide/restore and compact-panel dragging.
+- `runtime/native-ui-7.9.0.js` — event-driven floating POT HUD, cached club OVR annotations, quick menu, native Seed Finder, hide/restore and compact-panel dragging.
 
-The 7.3–7.7 native UI runtimes are no longer required or executed. In particular, the brittle attempt to find/inject into the game's OVR tile was removed. Normal gameplay now has no full React-tree scan from native UI, no root MutationObserver, and no generic decision-button injection.
+The 7.3–7.8 native UI runtimes are no longer required or executed. Normal gameplay has no native full React-tree scan, no root MutationObserver, no generic decision-button injection and no continuous native-UI polling.
 
-Club annotation is event-driven: cached data is used immediately, and short refresh bursts run after user actions or active-save changes. The expensive game bundle is reparsed only when its hashed script URL changes.
+Club annotation is event-driven. Cached data is used immediately and short refresh bursts run after user actions. The expensive game bundle is reparsed only when its hashed script URL changes, and the refresh is deferred until startup work has settled.
+
+The legacy core's sync/update semantics are preserved. The performance gate changes only *when* the local-change detector runs, not how snapshots are merged, verified or uploaded. Startup/resume/periodic sync remain owned by the core.
 
 ## Important game keys
 
@@ -59,7 +63,7 @@ The file wraps the existing logical `__legSync: 2` payload with schema/device me
 
 On the first v7 run, if no device snapshot exists, the script imports the seven legacy v6.15 chunk files and publishes the first v3 snapshot. Legacy files remain for compatibility.
 
-Auto-sync triggers on startup, resume, five seconds after detected local changes, and every three minutes while visible. Startup/resume may reload once when remote data changed and there was no user interaction during the request.
+Auto-sync triggers on startup, resume, local changes and every three minutes while visible. In 7.9 the local-change detector no longer hashes all Legionnaire localStorage every three seconds continuously; it runs after user activity during idle time and has a two-minute safety check. Startup/resume may reload once when remote data changed and there was no user interaction during the request.
 
 ## Authentication
 
@@ -76,8 +80,9 @@ The Gist token requires only **Gists: Read and write**. Tokens live in Tampermon
 
 ## Near-term cleanup
 
-- Validate 7.8 performance on Firefox Android over several consecutive decision screens.
+- Validate 7.9 performance on Firefox Android over several consecutive decision screens and confirm the previous periodic stutter is gone.
+- Confirm HUD tapping reliably opens the quick menu and dragging still works with normal finger jitter.
+- Confirm POT disappears on non-career screens and the mobile default position matches the real-device preference.
 - Confirm cached `OVR NN` badges appear effectively immediately on subsequent transfer windows.
-- Validate draggable HUD and compact secondary panel on mobile and desktop.
 - Inspect the game's probabilistic decision handler before implementing deterministic outcome selection; do not globally patch randomness.
 - After both device snapshot files are proven stable, remove dormant v6.15 chunk transport.
