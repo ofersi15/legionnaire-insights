@@ -1,5 +1,16 @@
 # Changelog
 
+## 7.9.0 - 2026-09-04
+
+- Removed all continuous native-UI polling. The HUD, club badges and compact-panel positioning now refresh only on startup, user interaction, visibility changes and resize.
+- Extended the pre-core performance gate to the legacy 3-second local-change detector. That detector hashed all Legionnaire localStorage on every tick; it now runs after user activity during idle time, with a two-minute safety check, while the core's periodic/startup/resume sync behavior remains intact.
+- Kept the legacy 700ms React-panel render gated behind actual panel visibility and reduced visible-panel refresh pressure further.
+- Rebuilt HUD tapping so normal click handling opens the quick menu and drag suppression uses a 12px threshold; small finger movement on Firefox Android no longer turns ordinary taps into failed drags.
+- Changed the default mobile HUD position to roughly the lower-left of the player header (`left: 20px`, `top: 62px`), matching the preferred real-device placement. Dragged positions remain remembered.
+- Stale save data no longer causes a random POT to appear on the home/new-career screen. POT is displayed only when an actual career UI with a visible `OVR` label is present; outside a career the launcher shows only `LI`.
+- Club annotations remain `OVR NN` only (no tier). Cached club data is used immediately; post-interaction annotation uses a short 0/70/200/500ms burst instead of waiting for a polling cycle.
+- Kept the native Seed Finder, strongest-offer outline, draggable compact core panel and the v7.2 sync/update implementation.
+
 ## 7.8.0 - 2026-09-04
 
 - Removed the brittle OVR-tile integration entirely. POT now lives in a tiny draggable floating `LI · POT NN` HUD, so it is always visible and the quick menu has one reliable click target independent of the game's DOM structure.
