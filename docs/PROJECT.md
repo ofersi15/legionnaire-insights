@@ -3,7 +3,7 @@
 ## Current state
 
 - Userscript: `legionnaire-insights.user.js`
-- Current release: `7.5.0`
+- Current release: `7.6.0`
 - Target: `https://www.legionnaire.xyz/*`
 - Desktop: Chrome; mobile: Firefox Android; both use Tampermonkey.
 - Code delivery: public GitHub raw URL in `@updateURL` and `@downloadURL`.
@@ -17,7 +17,7 @@ The game is a React SPA with no account/backend. Saves are event-sourced in orig
 - Club name/tier/overall lookup from the live Vite bundle.
 - Agent reference table and probabilistic decision previews in the secondary panel.
 - Native club-choice annotations for tier/overall and strongest visible offer without changing card layout.
-- POT/growth shown inside the existing OVR tile; tapping OVR opens the quick menu and restores LI when hidden.
+- Fixed career POT shown inside the existing OVR tile; only that exact tile opens/restores the LI quick menu.
 - Native Seed Finder with remembered targets, inline results, apply-and-reload and a new-career entry point.
 - Automatic cross-device synchronization plus manual export/import fallback.
 - Hourly version awareness on startup/resume and manual sync, with an in-panel install link when GitHub has a newer release.
@@ -27,11 +27,13 @@ The game is a React SPA with no account/backend. Saves are event-sourced in orig
 `legionnaire-insights.user.js` is a small Tampermonkey entry point. It currently `@require`s two repository runtimes:
 
 - `runtime/legionnaire-insights-core-7.2.0.js` — frozen core containing sync, update checks, Seed Finder fallback, verbose details/agents/tools and the secondary panel.
-- `runtime/native-ui-7.5.0.js` — low-overhead in-game presentation, native Seed Finder workflow and hide/restore behavior.
+- `runtime/native-ui-7.6.0.js` — low-overhead in-game presentation, native Seed Finder workflow and hide/restore behavior.
 
-The old 7.3 and 7.4 UI runtimes are no longer required or executed. Stacking them caused two independent full React-fiber scans plus repeated DOM scans every ~600–700ms, which was too expensive on Firefox Android and also let injected outcome pills affect the intrinsic size of game buttons.
+The old 7.3, 7.4 and 7.5 UI runtimes are no longer required or executed. 7.6 removes the 7.5 root `MutationObserver`; presentation refreshes primarily when the active save changes, plus visibility and a 12-second recovery refresh. This avoids rescanning the DOM after every React subtree mutation on Firefox Android.
 
-The 7.5 native runtime avoids full React-tree polling. It derives creation POT/development from the active save seed, reads current OVR from the visible OVR tile, matches visible clickable club names against the live club DB, and updates presentation on debounced DOM/save changes. Club metadata is rendered through absolute pseudo-elements so LI does not add width or height to the game's choice cards. Generic probabilistic decision buttons are not modified.
+POT/development are derived from the active career seed; POT is fixed for the career. Current OVR is read from the compact visible OVR tile. The quick-menu listener is attached directly to that exact tile rather than using a delegated ancestor heuristic.
+
+Club choices are matched by visible club-name text against the live club DB only during a refresh. Metadata is rendered as short absolutely positioned DOM badges (`T1 · 84`) and strongest-club outlining; injected nodes remain out of flow and must not change card dimensions. Generic probabilistic decision buttons are not modified.
 
 Seed search uses a Web Worker when available; its fallback uses small idle-time batches so it does not monopolize the game thread.
 
@@ -86,10 +88,11 @@ The panel also checks the same raw URL at most hourly (or immediately on a manua
 
 ## Near-term cleanup
 
-- Validate 7.5 performance on Firefox Android across several consecutive decision screens and transfer windows.
-- Validate that transfer club badges no longer alter button dimensions and that the national-team row / lower transfer CTA remain visible.
+- Validate 7.6 performance on Firefox Android across several consecutive decision screens and transfer windows.
+- Validate that POT is visible inside the exact OVR tile and that only that tile opens LI.
+- Validate short club badges on narrow three-card mobile layouts.
+- Inspect the live probabilistic decision handler before implementing any deterministic/forced outcome control; preserve the game's own save/event format rather than globally patching randomness.
 - Validate native Seed Finder Worker behavior on Firefox Android and fallback behavior where Workers are blocked.
-- Validate club annotations and hide/restore across desktop and mobile.
 - Validate v7 migration and background behavior on both real devices.
 - After both device snapshot files exist and are proven stable, remove the dormant v6.15 chunk transport.
 - If active careers with different seeds must be handed off, add explicit conflict selection; never use silent last-write-wins.
