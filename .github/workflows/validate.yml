@@ -4,10 +4,12 @@ on:
   push:
     paths:
       - legionnaire-insights.user.js
+      - runtime/**.js
       - .github/workflows/validate.yml
   pull_request:
     paths:
       - legionnaire-insights.user.js
+      - runtime/**.js
       - .github/workflows/validate.yml
 
 jobs:
@@ -19,7 +21,10 @@ jobs:
         with:
           node-version: 22
       - name: Check JavaScript syntax
-        run: node --check legionnaire-insights.user.js
+        shell: bash
+        run: |
+          node --check legionnaire-insights.user.js
+          for file in runtime/*.js; do node --check "$file"; done
       - name: Check Tampermonkey metadata
         shell: bash
         run: |
@@ -27,3 +32,4 @@ jobs:
           grep -Fq '// @namespace    legionnaire-insights' legionnaire-insights.user.js
           grep -Fq '// @updateURL    https://raw.githubusercontent.com/ofersi15/legionnaire-insights/main/legionnaire-insights.user.js' legionnaire-insights.user.js
           grep -Fq '// @downloadURL  https://raw.githubusercontent.com/ofersi15/legionnaire-insights/main/legionnaire-insights.user.js' legionnaire-insights.user.js
+          grep -Eq '^// @require[[:space:]]+https://raw.githubusercontent.com/ofersi15/legionnaire-insights/main/runtime/native-ui-[0-9]+\.[0-9]+\.[0-9]+\.js$' legionnaire-insights.user.js
