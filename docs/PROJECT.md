@@ -3,7 +3,7 @@
 ## Current state
 
 - Userscript: `legionnaire-insights.user.js`
-- Current release: `7.3.0`
+- Current release: `7.4.0`
 - Target: `https://www.legionnaire.xyz/*`
 - Desktop: Chrome; mobile: Firefox Android; both use Tampermonkey.
 - Code delivery: public GitHub raw URL in `@updateURL` and `@downloadURL`.
@@ -16,19 +16,22 @@ The game is a React SPA with no account/backend. Saves are event-sourced in orig
 - Hidden overall, potential, development profile, age and position.
 - Club name/tier/overall lookup from the live Vite bundle.
 - Agent reference table and probabilistic decision previews.
-- Native in-flow live insights beside decision choices; the responsive tabbed overlay is secondary UI for verbose details, agents, tools and sync.
-- Seed Finder with apply-and-reload.
+- Native decision-card annotations for club tier/overall and strongest visible offer.
+- Zero-layout transfer-header LI/POT chip; verbose details, agents, tools and sync remain on demand.
+- Native Seed Finder with remembered targets, inline results and apply-and-reload; a seed entry is also injected beside the new-career control when available.
+- Full native-UI hide/restore. Hidden mode removes annotations and launchers; the player's top OVR restores LI, with Alt+L / top-left long-press fallbacks.
 - Automatic cross-device synchronization plus manual export/import fallback.
 - Hourly version awareness on startup/resume and manual sync, with an in-panel install link when GitHub has a newer release.
 
 ## Runtime layout
 
-`legionnaire-insights.user.js` is now a small Tampermonkey entry point. It `@require`s two versioned runtime files from this repository:
+`legionnaire-insights.user.js` is a small Tampermonkey entry point. It currently `@require`s three repository runtimes:
 
 - `runtime/legionnaire-insights-core-7.2.0.js` — frozen 7.2 core containing sync, update checks, tools and the secondary panel.
-- `runtime/native-ui-7.3.0.js` — native decision-screen enhancements that inject only presentation-layer metadata into the live game DOM.
+- `runtime/native-ui-7.3.0.js` — club-choice discovery and annotation against the live game DOM.
+- `runtime/native-ui-7.4.0.js` — mobile layout patch, transfer-header chip, native Seed Finder and hide/restore behavior.
 
-The split intentionally isolates the new UI work from the proven sync/update path. Future releases may fold the files back together once native DOM integration is proven stable on both real devices.
+The layered split intentionally keeps sync/update code untouched while native DOM integration is being proven on the real game. The 7.4 layer hides the old 7.3 summary row rather than changing 7.3's working club-card logic.
 
 ## Important game keys
 
@@ -81,7 +84,8 @@ The panel also checks the same raw URL at most hourly (or immediately on a manua
 
 ## Near-term cleanup
 
-- Validate native decision-card injection on desktop and Firefox Android across club-choice and probabilistic-decision screens.
+- Validate the 7.4 transfer-header chip, restored national-team visibility, bottom transfer CTA and native Seed Finder on Firefox Android.
+- Validate club annotations and hide/restore across desktop and mobile decision screens.
 - Validate v7 migration and background behavior on both real devices.
 - After both device snapshot files exist and are proven stable, remove the dormant v6.15 chunk transport.
 - If active careers with different seeds must be handed off, add explicit conflict selection; never use silent last-write-wins.
