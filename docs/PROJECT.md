@@ -3,7 +3,7 @@
 ## Current state
 
 - Userscript: `legionnaire-insights.user.js`
-- Current release: `8.1.0`
+- Current release: `8.2.0`
 - Target: `https://www.legionnaire.xyz/*`
 - Desktop: Chrome; mobile: Firefox Android; both use Tampermonkey.
 - Code delivery: public GitHub raw URL in `@updateURL` and `@downloadURL`.
@@ -20,6 +20,7 @@ The game is a React SPA with no account/backend. Saves are event-sourced in orig
 - Mobile default HUD position is near the lower-left of the player header (`left: 20px`, `top: 62px`); dragging persists a custom position.
 - Tapping the HUD opens one mobile-first bottom sheet. The legacy 7.2 overlay/panel is no longer loaded.
 - Bottom-sheet sections: player Details, native Seed Finder, Agents, and Sync/Settings.
+- An opt-in seed preview marks the predetermined outcome on probabilistic personal decisions. It is read-only, defaults off and supports two or more outcomes.
 - Club-choice cards show only `OVR NN`, with the strongest visible offer outlined. Tier text is intentionally omitted.
 - Club data is cached locally after the first live-bundle parse. Full and short club names are indexed so cards can match either form; agent preferred-club IDs resolve to names from the same cache.
 - Club annotation is incremental and normally uses sparse post-interaction retries over 2.4 seconds. Firefox Android can render transfer cards after that window, so the wrapper arms one bounded late refresh after the user becomes idle and one final recovery only if no LI club badge appeared. There is no continuous observer or interval.
@@ -33,7 +34,7 @@ The game is a React SPA with no account/backend. Saves are event-sourced in orig
 
 `legionnaire-insights.user.js` `@require`s exactly one runtime:
 
-- `runtime/legionnaire-insights-8.1.0.js`
+- `runtime/legionnaire-insights-8.2.0.js`
 
 The active install does **not** load `legionnaire-insights-core-7.2.0.js`, any `perf-gate-*`, any `native-ui-7.x`, or `diagnostics-7.10.0.js`. Those files remain in repository history only.
 
@@ -41,11 +42,13 @@ V8 is intentionally event-driven:
 
 - no `setInterval` during gameplay;
 - no root `MutationObserver`;
-- no React-fiber scanning in the deployed v8 runtime;
+- no root or full-tree React-fiber scanning in the deployed v8 runtime;
 - no localStorage fingerprint loop;
 - no periodic three-minute cloud sync.
 
 HUD/toolbar and club UI refresh after real user interaction, visibility changes, a coalesced resize frame, a short startup burst and the bounded late club recovery described above. There is no continuous gameplay watcher. At 900px+ with a fine pointer, the toolbar is inserted immediately before the player card's trophy case; narrower or coarse-pointer layouts retain the draggable floating HUD.
+
+Seed preview starts at visible probabilistic cards, uses Tampermonkey's page bridge where needed, and walks at most eight `return` links to their `decision` and `option` props. It never walks child/sibling fibers or the React root. Step is the active save's ordered `choices.length`, the same replay cursor used by the game; LI reproduces the seeded cumulative roll without mutation.
 
 The deployable wrapper contains only small compatibility bridges around the single runtime: Tampermonkey update handoff plus bounded recovery for late/single-club cards. Feature/state/sync logic remains in the runtime.
 
@@ -89,7 +92,7 @@ There is no background fingerprinting and no automatic sync after ordinary decis
 
 ## Authentication
 
-The Gist token requires only **Gists: Read and write**. Tokens live in Tampermonkey-private `GM_*Value`, never page `localStorage`. The v8 runtime retains one-time migration from the old page-local token key.
+The Gist token requires **Gists: Read and write** and lives in Tampermonkey-private `GM_*Value`; v8 migrates the old page-local token once.
 
 ## Validation
 
@@ -99,17 +102,10 @@ GitHub Actions runs:
 - Tampermonkey metadata checks;
 - v8 sync compatibility tests covering compression round-trip, checksum rejection, idempotent repeated ledger merge, independent device filenames, career-history union and same-seed advancement;
 - active-save fallback tests for the sport-specific and legacy football save keys;
-- architecture guards requiring exactly one runtime and forbidding `setInterval` / `__reactFiber` in the deployed v8 runtime.
+- architecture guards requiring one runtime, no intervals and only the bounded card-local React access used by seed preview.
 
 ## Probabilistic-decision research
 
 The active bundle renders personal cards with `onClick: () => onChoose(option.id)`. The one-argument callback finds the original pending option, derives an RNG from `seed + step + optionId`, and samples its outcomes cumulatively. Saves record only ordered choice IDs and replay outcomes from the seed.
 
 The research branch's option-clone Candidates A/B therefore cannot reach the handler. A transient mutation would not survive refresh. Forcing remains research-only until it has a replay-safe representation without a global RNG patch, continuous React scan or save corruption.
-
-## Near-term work
-
-- Validate the 8.0.4 one-club OVR fallback on the end-of-cycle screen.
-- Verify retirement-triggered push on both normal and confirmation-dialog retirement flows.
-- Verify startup pull and manual Sync between both real devices with existing v7 snapshots.
-- Find a replay-safe representation for forced outcomes, then validate it in live careers before integrating any production control.

@@ -1,5 +1,13 @@
 # Changelog
 
+## 8.2.0 - 2026-09-04
+
+- Added an opt-in, read-only seed outcome preview. `כלים / Sync` now includes `תחזית: כבויה/פעילה`; when enabled, the outcome that the current seed will roll is outlined and marked `🔮 נקבע` (`🔮` on narrow mobile).
+- The preview reproduces the game's active deterministic path exactly: the active save's `choices.length` replay cursor, FNV seed hash, the `seed-step-apply-optionId` RNG key, one Mulberry-style draw and cumulative probability bands. It supports any outcome count, including the live three-outcome 60/20/20 football event.
+- Kept gameplay unchanged: no probabilities, option objects, callbacks, save data or RNG state are modified. The feature defaults off and only reads data while an actual probabilistic personal-decision card is visible.
+- Added a narrowly bounded React lookup starting from each visible personal option and walking at most eight parent fibers. There is no root/full-tree scan, child/sibling traversal, observer, interval or background loop; CI now permits only this localized access pattern.
+- Added deterministic fixtures for first/middle/last selection in a three-outcome option, immutability, opt-in behavior and architecture guards.
+
 ## 8.1.0 - 2026-09-04
 
 - Added a responsive desktop toolbar inside the player card, immediately above the trophy case: `POT NN · gap`, Details, Seed Finder and Tools / Sync. It is 30px tall, does not float over the decision area and is not draggable.

@@ -39,6 +39,8 @@ node --check legionnaire-insights.user.js
 
 The same syntax and metadata checks run automatically in GitHub Actions.
 
+The deployed runtime must not scan from the React root or traverse child/sibling fibers. Seed preview may only start at a visible probabilistic option card and walk a small, hard-bounded `return` chain; keep the CI guard precise to that exception.
+
 For sync changes also test compression round-trip, checksum rejection, idempotent repeated merge, two independent device files and same-seed advancement. Record only the result in the changelog; do not commit large fixtures.
 
 ## Documentation budget

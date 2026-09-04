@@ -48,5 +48,7 @@ jobs:
           runtime_file="$(sed -n 's#^// @require[[:space:]]\+https://raw.githubusercontent.com/ofersi15/legionnaire-insights/main/\(runtime/legionnaire-insights-[0-9][0-9.]*\.js\)$#\1#p' legionnaire-insights.user.js)"
           test -n "$runtime_file"
           test -f "$runtime_file"
-          ! grep -q '__reactFiber' "$runtime_file"
+          test "$(grep -oF '__reactFiber$' "$runtime_file" | wc -l)" -eq 1
+          ! grep -Eq 'fiber\.(child|sibling)' "$runtime_file"
+          ! grep -Eq "querySelectorAll\(['\"]\*['\"]\)" "$runtime_file"
           ! grep -q 'setInterval' "$runtime_file"

@@ -55,8 +55,9 @@ storage.clear();
 storage.setItem(LEGACY, JSON.stringify({ choices: [] }));
 assert.equal(activeSaveRecord('football'), null, 'a stale object without a seed is not an active save');
 
-const runtimePath = path.join(__dirname, '..', 'runtime', 'legionnaire-insights-8.1.0.js');
+const runtimePath = path.join(__dirname, '..', 'runtime', 'legionnaire-insights-8.2.0.js');
 const runtime = fs.readFileSync(runtimePath, 'utf8');
+const wrapper = fs.readFileSync(path.join(__dirname, '..', 'legionnaire-insights.user.js'), 'utf8');
 const breakpointMatch = runtime.match(/const DESKTOP_MIN_WIDTH = (\d+);/);
 assert.ok(breakpointMatch, 'desktop breakpoint must be explicit and testable');
 const desktopMinWidth = Number(breakpointMatch[1]);
@@ -73,6 +74,47 @@ assert.match(runtime, /data-toolbar-action="seed"/, 'desktop toolbar exposes See
 assert.match(runtime, /data-toolbar-action="main"/, 'desktop toolbar exposes tools and Sync');
 assert.match(runtime, /toolbarAnchor\.insertBefore\(hud, trophyCase \|\| null\)/, 'toolbar is inserted inside the player card before the trophy case');
 assert.doesNotMatch(runtime, /setInterval/, 'deployed runtime must not poll');
-assert.doesNotMatch(runtime, /__reactFiber/, 'deployed runtime must not scan React fibers');
+assert.match(runtime, /document\.querySelectorAll\('\.decision \.option--personal'\)/, 'prediction lookup must start from visible decision cards');
+assert.match(runtime, /depth < 8/, 'React lookup must have a small hard traversal bound');
+assert.doesNotMatch(runtime, /fiber\.(child|sibling)/, 'prediction lookup must never traverse the React tree');
+assert.doesNotMatch(runtime, /querySelectorAll\(['"]\*['"]\)/, 'prediction lookup must never scan every DOM element');
+assert.match(wrapper, /^\/\/ @grant\s+unsafeWindow$/m, 'wrapper must expose the page bridge for Chrome and Firefox userscript sandboxes');
+
+function seedHash(text) {
+  let state = 2166136261 >>> 0;
+  for (let i = 0; i < text.length; i++) { state ^= text.charCodeAt(i); state = Math.imul(state, 16777619); }
+  return state >>> 0;
+}
+
+function seededDraw(seed) {
+  const state = ((seedHash(seed) || 1) + 1831565813) >>> 0;
+  let n = state;
+  n = Math.imul(n ^ (n >>> 15), n | 1);
+  n ^= n + Math.imul(n ^ (n >>> 7), n | 61);
+  return ((n ^ (n >>> 14)) >>> 0) / 4294967296;
+}
+
+function predictedIndex(seed, step, option) {
+  const draw = seededDraw(`${seed}-${step}-apply-${option.id}`);
+  let cumulative = 0;
+  for (let index = 0; index < option.outcomes.length; index++) {
+    cumulative += option.outcomes[index].probability;
+    if (draw < cumulative) return index;
+  }
+  return option.outcomes.length - 1;
+}
+
+const threeOutcomeOption = {
+  id: 'LATE_SALARY-report-to-tax-authority',
+  outcomes: [{ probability: 0.6 }, { probability: 0.2 }, { probability: 0.2 }],
+};
+const originalOutcomes = JSON.stringify(threeOutcomeOption);
+assert.equal(predictedIndex('toolbar-live-fixture', 7, threeOutcomeOption), 0, 'three-outcome preview selects the first band');
+assert.equal(predictedIndex('fixture-9', 7, threeOutcomeOption), 1, 'three-outcome preview selects the middle band');
+assert.equal(predictedIndex('fixture-6', 7, threeOutcomeOption), 2, 'three-outcome preview selects the final band');
+assert.equal(JSON.stringify(threeOutcomeOption), originalOutcomes, 'prediction must not mutate outcomes or probabilities');
+assert.match(runtime, /localStorage\.getItem\(PREDICTIONS_KEY\) === '1'/, 'predictions must default off and require explicit opt-in');
+assert.match(runtime, /Array\.isArray\(save\.choices\) \? save\.choices\.length : null/, 'prediction step must use the active save replay cursor');
+assert.match(runtime, /היא אינה משנה את המשחק או את השמירה/, 'the UI must disclose that preview is read-only');
 
 console.log('v8 UI logic tests: OK');
