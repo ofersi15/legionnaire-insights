@@ -3,7 +3,7 @@
 ## Current state
 
 - Userscript: `legionnaire-insights.user.js`
-- Current release: `8.0.0`
+- Current release: `8.0.1`
 - Target: `https://www.legionnaire.xyz/*`
 - Desktop: Chrome; mobile: Firefox Android; both use Tampermonkey.
 - Code delivery: public GitHub raw URL in `@updateURL` and `@downloadURL`.
@@ -14,22 +14,25 @@ The game is a React SPA with no account/backend. Saves are event-sourced in orig
 ## Features
 
 - Fixed career POT is derived from the active seed and shown in a tiny draggable `LI · POT NN` HUD while an actual career/player UI is visible.
+- Active-save lookup checks the sport-specific v2 save first, then the legacy `maslul-kariera:save:v1` fallback used by real football sessions, then the other sport save as a final compatibility fallback.
+- Career-screen detection prefers a visible OVR tile and falls back to rendered career text on Firefox/React layouts where the OVR caption is not cleanly discoverable in the DOM. A save alone is never enough to show POT.
 - Outside a career screen the HUD shows only `LI`; stale save data must never expose a fake POT.
 - Mobile default HUD position is near the lower-left of the player header (`left: 20px`, `top: 62px`); dragging persists a custom position.
 - Tapping the HUD opens one mobile-first bottom sheet. The legacy 7.2 overlay/panel is no longer loaded.
 - Bottom-sheet sections: player Details, native Seed Finder, Agents, and Sync/Settings.
 - Club-choice cards show only `OVR NN`, with the strongest visible offer outlined. Tier text is intentionally omitted.
-- Club data is cached locally after the first live-bundle parse. Agent preferred-club IDs are resolved to names from that same cache.
-- Seed search uses a Web Worker and can apply a chosen seed by rebuilding the active save and reloading.
+- Club data is cached locally after the first live-bundle parse. Full and short club names are indexed so cards can match either form; agent preferred-club IDs resolve to names from the same cache.
+- Club annotation is incremental and uses sparse post-interaction retries over 2.4 seconds because React may replace decision cards after the initial render. Real-device diagnostics measured a club scan at roughly 1–2ms, so this remains inexpensive without continuous observation.
+- Seed search uses a Web Worker and can apply a chosen seed by rebuilding the actually detected active-save key and reloading.
 - LI can be hidden completely; a low-opacity `LI` launcher remains at the saved HUD position for restoration.
 - Manual Export/Import remains available as a fallback.
 - Update awareness checks at startup (rate-limited to one hour) and on explicit request.
 
 ## Runtime architecture
 
-`legionnaire-insights.user.js` now `@require`s exactly one runtime:
+`legionnaire-insights.user.js` `@require`s exactly one runtime:
 
-- `runtime/legionnaire-insights-8.0.0.js`
+- `runtime/legionnaire-insights-8.0.1.js`
 
 The active install does **not** load `legionnaire-insights-core-7.2.0.js`, any `perf-gate-*`, any `native-ui-7.x`, or `diagnostics-7.10.0.js`. Those files remain in repository history only.
 
@@ -41,16 +44,15 @@ V8 is intentionally event-driven:
 - no localStorage fingerprint loop;
 - no periodic three-minute cloud sync.
 
-HUD/club UI refreshes after real user interaction, visibility changes, resize, and a short startup burst. Club DOM passes are cheap and limited to two short post-interaction passes.
-
-POT is computed from the seed and memoized. Career presence is determined by an active save plus a visible OVR tile; the detector does not require the `OVR` label to be a leaf node.
+HUD/club UI refreshes after real user interaction, visibility changes, resize, and a short startup burst. There is no continuous gameplay watcher.
 
 ## Important game keys
 
 | Key suffix | Meaning | Merge rule |
 | --- | --- | --- |
-| `football:save:v2` | Active football career | Same seed: longer `choices`; different seeds keep local |
-| `basketball:save:v2` | Active basketball career | Same rule |
+| `football:save:v2` | Football active-save key on newer layouts | Same seed: longer `choices`; different seeds keep local |
+| `save:v1` | Legacy/current football active-save fallback seen on real devices | Same rule |
+| `basketball:save:v2` | Basketball active career | Same rule |
 | `football:careers:v1` | Completed football careers | Union by `seed` |
 | `basketball:careers:v1` | Basketball history | Union by `seed` |
 | `collection:v1` | Football collection/stats | Per-device numeric ledger |
@@ -93,7 +95,8 @@ GitHub Actions runs:
 - JavaScript syntax checks for wrapper/runtime/tests;
 - Tampermonkey metadata checks;
 - v8 sync compatibility tests covering compression round-trip, checksum rejection, idempotent repeated ledger merge, independent device filenames, career-history union and same-seed advancement;
-- architecture guards requiring exactly one runtime and forbidding `setInterval` / `__reactFiber` in the v8 runtime.
+- active-save fallback tests for the sport-specific and legacy football save keys;
+- architecture guards requiring exactly one runtime and forbidding `setInterval` / `__reactFiber` in the deployed v8 runtime.
 
 ## Release flow
 
@@ -106,8 +109,8 @@ GitHub Actions runs:
 
 ## Near-term work
 
-- Real-device validation of 8.0 performance across several full careers on Firefox Android.
-- Verify POT detection on career/home/new-career screens and reliable HUD tap/drag behavior.
+- Real-device validation that 8.0.1 shows POT on active football careers while keeping it hidden on home/new-career screens.
+- Verify `OVR NN` annotations remain present across several transfer screens and delayed React rerenders.
 - Verify retirement-triggered push on both normal and confirmation-dialog retirement flows.
 - Verify startup pull and manual Sync between both real devices with existing v7 snapshots.
 - Inspect the game's probabilistic decision handler before implementing deterministic outcome selection; never globally patch randomness.
