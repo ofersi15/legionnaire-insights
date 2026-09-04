@@ -5,11 +5,13 @@ on:
     paths:
       - legionnaire-insights.user.js
       - runtime/**.js
+      - tests/**.js
       - .github/workflows/validate.yml
   pull_request:
     paths:
       - legionnaire-insights.user.js
       - runtime/**.js
+      - tests/**.js
       - .github/workflows/validate.yml
 
 jobs:
@@ -25,6 +27,9 @@ jobs:
         run: |
           node --check legionnaire-insights.user.js
           for file in runtime/*.js; do node --check "$file"; done
+          for file in tests/*.js; do node --check "$file"; done
+      - name: Run v8 sync compatibility tests
+        run: node tests/v8-sync.test.js
       - name: Check Tampermonkey metadata
         shell: bash
         run: |
@@ -32,4 +37,10 @@ jobs:
           grep -Fq '// @namespace    legionnaire-insights' legionnaire-insights.user.js
           grep -Fq '// @updateURL    https://raw.githubusercontent.com/ofersi15/legionnaire-insights/main/legionnaire-insights.user.js' legionnaire-insights.user.js
           grep -Fq '// @downloadURL  https://raw.githubusercontent.com/ofersi15/legionnaire-insights/main/legionnaire-insights.user.js' legionnaire-insights.user.js
-          grep -Eq '^// @require[[:space:]]+https://raw.githubusercontent.com/ofersi15/legionnaire-insights/main/runtime/native-ui-[0-9]+\.[0-9]+\.[0-9]+\.js$' legionnaire-insights.user.js
+          grep -Eq '^// @require[[:space:]]+https://raw.githubusercontent.com/ofersi15/legionnaire-insights/main/runtime/legionnaire-insights-[0-9]+\.[0-9]+\.[0-9]+\.js$' legionnaire-insights.user.js
+      - name: Enforce v8 no-polling architecture
+        shell: bash
+        run: |
+          test "$(grep -c '^// @require' legionnaire-insights.user.js)" -eq 1
+          ! grep -q '__reactFiber' runtime/legionnaire-insights-8.0.0.js
+          ! grep -q 'setInterval' runtime/legionnaire-insights-8.0.0.js
