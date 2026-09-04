@@ -1,5 +1,15 @@
 # Changelog
 
+## 7.4.0 - 2026-09-03
+
+- Removed the tall 7.3 Potential/Tools row from the transfer-window layout and replaced it with a compact absolute LI/POT chip in the transfer header, so Legionnaire Insights no longer adds vertical height that can cover the national-team row or push the lower transfer CTA below the mobile viewport.
+- Added a compact LI quick menu with direct access to Details, native Seed Finder, Tools/Sync and a full Hide LI action.
+- Added a native mobile-friendly Seed Finder with remembered Potential/starting-OVR/development targets, cooperative search/cancel, inline results and one-tap apply-and-reload.
+- Added a `מצא סיד לקריירה חדשה` entry beside the game's new-career control when that screen is visible.
+- Added full native-UI hiding: club annotations, strongest-club outline, LI chip, seed entry and the legacy launcher disappear. Tapping the player's top OVR restores LI; Alt+L and an invisible long-press gesture in the page's top-left corner are fallbacks.
+- Kept the v7.2 sync/update core unchanged and left v7.3 responsible for the proven club-card annotations; v7.4 is a presentation/workflow patch layered after it.
+- Passed `node --check` locally for the 7.4 runtime and deployable userscript; validation workflow now checks every runtime JavaScript file as well as the wrapper metadata.
+
 ## 7.3.0 - 2026-09-03
 
 - Moved live player insights into the game's own decision layout instead of keeping the overlay open over gameplay.
