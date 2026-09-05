@@ -3,7 +3,7 @@
 ## Current state
 
 - Userscript: `legionnaire-insights.user.js`
-- Current release: `8.2.3`
+- Current release: `8.2.4`
 - Target: `https://www.legionnaire.xyz/*`
 - Desktop: Chrome; mobile: Firefox Android; both use Tampermonkey.
 - Code delivery: public GitHub raw URL in `@updateURL` and `@downloadURL`.
@@ -23,9 +23,9 @@ The game is a React SPA with no account/backend. Saves are event-sourced in orig
 - An opt-in seed preview marks the predetermined outcome on probabilistic personal decisions. It is read-only, defaults off and supports two or more outcomes.
 - Club-choice cards show only `OVR NN`, with the strongest visible offer outlined. Tier text is intentionally omitted.
 - Club data is cached after the first bundle parse and separated by sport, including identical IDs. Full names take precedence over short aliases; agent preferred-club IDs resolve from the active sport's map.
-- Club annotation is incremental and normally uses sparse post-interaction retries over 2.4 seconds. Firefox Android can render transfer cards after that window, so the wrapper arms one bounded late refresh after the user becomes idle and one final recovery only if no LI club badge appeared. There is no continuous observer or interval.
+- Club annotation is incremental and normally uses sparse post-interaction retries over 2.4 seconds. Firefox Android can render transfer cards after that window, so the wrapper arms one bounded late refresh after the user becomes idle and one final recovery only if no LI club badge appeared.
 - End-of-cycle screens can contain exactly one club offer beside Retirement. Because the runtime only compares 2+ offers, the wrapper has a narrow cached-club fallback that annotates exactly one club with `OVR NN` without applying a “strongest” outline.
-- Seed search uses a Web Worker and can apply a chosen seed by rebuilding the actually detected active-save key and reloading.
+- Seed search uses a Web Worker; applying a seed writes the active sport's save (`PG` for basketball, `ST` for football), repairs invalid basketball positions, then reloads.
 - LI can be hidden completely; a low-opacity `LI` launcher remains at the saved HUD position for restoration.
 - Manual Export/Import remains available as a fallback.
 - Update awareness checks at startup (rate-limited to one hour) and on explicit request. When a newer version is detected, the in-app control changes to `עדכן ל-X` and hands the raw `.user.js` URL to Tampermonkey for its normal update/install confirmation screen.
@@ -34,7 +34,7 @@ The game is a React SPA with no account/backend. Saves are event-sourced in orig
 
 `legionnaire-insights.user.js` `@require`s exactly one runtime:
 
-- `runtime/legionnaire-insights-8.2.3.js`
+- `runtime/legionnaire-insights-8.2.4.js`
 
 The active install does **not** load `legionnaire-insights-core-7.2.0.js`, any `perf-gate-*`, any `native-ui-7.x`, or `diagnostics-7.10.0.js`. Those files remain in repository history only.
 

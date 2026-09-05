@@ -1,5 +1,11 @@
 # Changelog
 
+## 8.2.4 - 2026-09-05
+
+- Fixed basketball careers created from Seed Finder receiving the football position `ST`, which makes the game fail when it tries to simulate the first season. New basketball seed saves now default to `PG` and preserve any valid basketball position.
+- Seed Finder now always writes the active sport's dedicated save key instead of following a legacy/other-sport fallback and potentially overwriting the wrong career.
+- Added a one-time boot repair for affected active basketball saves: an invalid position is changed to `PG`, the page reloads, and the existing career continues with the same seed and choices.
+
 ## 8.2.3 - 2026-09-05
 
 - Fixed seed previews disappearing in real careers after auxiliary agent or sponsor choices. Saved `choices.length` is a replay cursor, not the game's season step; the preview now parses the actual step from the live decision ID.

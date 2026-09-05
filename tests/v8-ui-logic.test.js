@@ -56,7 +56,7 @@ storage.clear();
 storage.setItem(LEGACY, JSON.stringify({ choices: [] }));
 assert.equal(activeSaveRecord('football'), null, 'a stale object without a seed is not an active save');
 
-const runtimePath = path.join(__dirname, '..', 'runtime', 'legionnaire-insights-8.2.3.js');
+const runtimePath = path.join(__dirname, '..', 'runtime', 'legionnaire-insights-8.2.4.js');
 const runtime = fs.readFileSync(runtimePath, 'utf8');
 const wrapper = fs.readFileSync(path.join(__dirname, '..', 'legionnaire-insights.user.js'), 'utf8');
 const breakpointMatch = runtime.match(/const DESKTOP_MIN_WIDTH = (\d+);/);
@@ -83,6 +83,47 @@ assert.match(runtime, /decisionStepFromId/, 'prediction step must come from the 
 assert.doesNotMatch(runtime, /fiber\.(child|sibling)/, 'prediction lookup must never traverse the React tree');
 assert.doesNotMatch(runtime, /querySelectorAll\(['"]\*['"]\)/, 'prediction lookup must never scan every DOM element');
 assert.match(wrapper, /^\/\/ @grant\s+unsafeWindow$/m, 'wrapper must expose the page bridge for Chrome and Firefox userscript sandboxes');
+
+const seedPositionContext = {};
+vm.runInNewContext(`
+  const BASKETBALL_POSITIONS = new Set(['PG', 'SG', 'SF', 'PF', 'C']);
+  ${extractFunction(runtime, 'seedTemplatePosition')}
+  globalThis.results = {
+    newBasketball: seedTemplatePosition({}, 'basketball'),
+    brokenBasketball: seedTemplatePosition({ position: 'ST' }, 'basketball'),
+    existingBasketball: seedTemplatePosition({ position: 'PF' }, 'basketball'),
+    newFootball: seedTemplatePosition({}, 'football'),
+    existingFootball: seedTemplatePosition({ position: 'GK' }, 'football'),
+  };
+`, seedPositionContext);
+assert.deepEqual({ ...seedPositionContext.results }, {
+  newBasketball: 'PG', brokenBasketball: 'PG', existingBasketball: 'PF', newFootball: 'ST', existingFootball: 'GK',
+}, 'Seed Finder must use sport-valid position defaults');
+assert.match(runtime, /const key = preferredSaveKey\(\);\s+const current = readJson\(key, \{\}\)/, 'Seed Finder must create the active sport save instead of overwriting another sport fallback');
+assert.match(runtime, /if \(repairInvalidBasketballSave\(\)\) return;/, 'boot must repair Seed Finder basketball saves created with football positions');
+
+const repairStorage = new StorageMock();
+repairStorage.setItem(BASKETBALL, JSON.stringify({ seed: 'same-seed', position: 'ST', choices: ['same-choice'] }));
+const repairContext = { localStorage: repairStorage, reloads: 0 };
+vm.runInNewContext(`
+  const BASKETBALL_POSITIONS = new Set(['PG', 'SG', 'SF', 'PF', 'C']);
+  const PER_SPORT_KEYS = { basketball: { save: '${BASKETBALL}' } };
+  const AUTO_CONTINUE_KEY = 'legionnaire-insights:autoContinue';
+  const sport = () => 'basketball';
+  const readJson = (key, fallback) => { try { const raw = localStorage.getItem(key); return raw == null ? fallback : JSON.parse(raw); } catch (e) { return fallback; } };
+  const location = { reload() { reloads++; } };
+  ${extractFunction(runtime, 'repairInvalidBasketballSave')}
+  globalThis.first = repairInvalidBasketballSave();
+  globalThis.repaired = JSON.parse(localStorage.getItem(PER_SPORT_KEYS.basketball.save));
+  globalThis.second = repairInvalidBasketballSave();
+`, repairContext);
+assert.equal(repairContext.first, true, 'an invalid basketball position must be repaired');
+assert.equal(repairContext.repaired.position, 'PG', 'repair must use a valid basketball position');
+assert.equal(repairContext.repaired.seed, 'same-seed', 'repair must preserve the seed');
+assert.deepEqual(Array.from(repairContext.repaired.choices), ['same-choice'], 'repair must preserve existing choices');
+assert.equal(repairContext.localStorage.getItem('legionnaire-insights:autoContinue'), '1', 'repair must resume the existing career after reload');
+assert.equal(repairContext.reloads, 1, 'repair must reload exactly once');
+assert.equal(repairContext.second, false, 'a repaired save must not enter a reload loop');
 
 function extractFunction(source, name) {
   const start = source.indexOf(`function ${name}(`);
