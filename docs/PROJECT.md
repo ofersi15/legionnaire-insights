@@ -3,7 +3,7 @@
 ## Current state
 
 - Userscript: `legionnaire-insights.user.js`
-- Current release: `8.2.1`
+- Current release: `8.2.2`
 - Target: `https://www.legionnaire.xyz/*`
 - Desktop: Chrome; mobile: Firefox Android; both use Tampermonkey.
 - Code delivery: public GitHub raw URL in `@updateURL` and `@downloadURL`.
@@ -22,7 +22,7 @@ The game is a React SPA with no account/backend. Saves are event-sourced in orig
 - Bottom-sheet sections: player Details, native Seed Finder, Agents, and Sync/Settings.
 - An opt-in seed preview marks the predetermined outcome on probabilistic personal decisions. It is read-only, defaults off and supports two or more outcomes.
 - Club-choice cards show only `OVR NN`, with the strongest visible offer outlined. Tier text is intentionally omitted.
-- Club data is cached locally after the first live-bundle parse. Full and short club names are indexed so cards can match either form; agent preferred-club IDs resolve to names from the same cache.
+- Club data is cached after the first bundle parse and separated by sport, including identical IDs. Full names take precedence over short aliases; agent preferred-club IDs resolve from the active sport's map.
 - Club annotation is incremental and normally uses sparse post-interaction retries over 2.4 seconds. Firefox Android can render transfer cards after that window, so the wrapper arms one bounded late refresh after the user becomes idle and one final recovery only if no LI club badge appeared. There is no continuous observer or interval.
 - End-of-cycle screens can contain exactly one club offer beside Retirement. Because the runtime only compares 2+ offers, the wrapper has a narrow cached-club fallback that annotates exactly one club with `OVR NN` without applying a “strongest” outline.
 - Seed search uses a Web Worker and can apply a chosen seed by rebuilding the actually detected active-save key and reloading.
@@ -34,7 +34,7 @@ The game is a React SPA with no account/backend. Saves are event-sourced in orig
 
 `legionnaire-insights.user.js` `@require`s exactly one runtime:
 
-- `runtime/legionnaire-insights-8.2.1.js`
+- `runtime/legionnaire-insights-8.2.2.js`
 
 The active install does **not** load `legionnaire-insights-core-7.2.0.js`, any `perf-gate-*`, any `native-ui-7.x`, or `diagnostics-7.10.0.js`. Those files remain in repository history only.
 

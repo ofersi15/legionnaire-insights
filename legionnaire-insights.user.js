@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         Legionnaire Insights
 // @namespace    legionnaire-insights
-// @version      8.2.1
+// @version      8.2.2
 // @description  Seed outcome previews, responsive Legionnaire UI, club strength, seed tools and sparse conflict-safe cloud sync.
 // @match        https://www.legionnaire.xyz/*
 // @grant        GM_xmlhttpRequest
@@ -13,7 +13,7 @@
 // @connect      api.github.com
 // @connect      gist.githubusercontent.com
 // @connect      raw.githubusercontent.com
-// @require      https://raw.githubusercontent.com/ofersi15/legionnaire-insights/main/runtime/legionnaire-insights-8.2.1.js
+// @require      https://raw.githubusercontent.com/ofersi15/legionnaire-insights/main/runtime/legionnaire-insights-8.2.2.js
 // @homepageURL  https://github.com/ofersi15/legionnaire-insights
 // @source       https://github.com/ofersi15/legionnaire-insights
 // @updateURL    https://raw.githubusercontent.com/ofersi15/legionnaire-insights/main/legionnaire-insights.user.js
@@ -31,7 +31,7 @@
   const UPDATE_URL = 'https://raw.githubusercontent.com/ofersi15/legionnaire-insights/main/legionnaire-insights.user.js';
   const CLUB_BADGE_SELECTOR = '[data-li-v8-club-badge]';
   const CLUB_CARD_SELECTOR = '[data-li-v8-club-card]';
-  const CLUB_CACHE_KEY = 'legionnaire-insights:club-cache-v3';
+  const CLUB_CACHE_KEY = 'legionnaire-insights:club-cache-v4';
   let latestPromise = null;
   let lateClubTimer = 0;
   let finalClubTimer = 0;
@@ -113,12 +113,21 @@
     try {
       const cache = JSON.parse(localStorage.getItem(CLUB_CACHE_KEY) || 'null');
       if (!cache || !Array.isArray(cache.items)) return null;
+      const activeSport = localStorage.getItem('maslul-kariera:sport:v1') === 'basketball'
+        ? 'basketball'
+        : 'football';
+      const activeItems = cache.items.filter((item) => item && item.sport === activeSport);
       const aliases = new Map();
-      for (const item of cache.items) {
+      for (const item of activeItems) {
         if (!item || !Number.isFinite(Number(item.ovr))) continue;
-        for (const raw of [item.name, item.shortName, ...(item.aliases || [])]) {
+        const key = norm(item.name);
+        if (key) aliases.set(key, item);
+      }
+      for (const item of activeItems) {
+        if (!item || !Number.isFinite(Number(item.ovr))) continue;
+        for (const raw of [item.shortName, ...(item.aliases || [])]) {
           const key = norm(raw);
-          if (key) aliases.set(key, item);
+          if (key && !aliases.has(key)) aliases.set(key, item);
         }
       }
       return aliases.size ? aliases : null;

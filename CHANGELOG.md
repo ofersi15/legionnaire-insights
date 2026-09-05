@@ -1,5 +1,12 @@
 # Changelog
 
+## 8.2.2 - 2026-09-04
+
+- Fixed cross-sport club ratings overwriting one another in the local club cache. The live bundle gives football Olympiacos OVR 84 and basketball Olympiacos OVR 90 under the same internal ID; the UI could therefore show 90 on a football offer.
+- Tagged every parsed club with its sport, retained duplicate IDs under sport-qualified cache keys, and rebuilt name/ID maps only from the active sport. The wrapper's single-club fallback now uses the same sport-aware v4 cache.
+- Indexed exact full club names before short aliases. This prevents the football short name for Olympiakos Nicosia (OVR 70) from taking the exact Greek Olympiacos name (OVR 84).
+- Added regressions for football/basketball Olympiacos, the Nicosia alias collision, source-table sport detection and sport-qualified duplicate IDs.
+
 ## 8.2.1 - 2026-09-04
 
 - Fixed seed previews reading stale React props after a decision-card commit. React can retain the previous render on the DOM-linked fiber and place the current render on its `alternate`, which could produce a valid calculation for the wrong option.

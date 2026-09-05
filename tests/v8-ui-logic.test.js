@@ -56,7 +56,7 @@ storage.clear();
 storage.setItem(LEGACY, JSON.stringify({ choices: [] }));
 assert.equal(activeSaveRecord('football'), null, 'a stale object without a seed is not an active save');
 
-const runtimePath = path.join(__dirname, '..', 'runtime', 'legionnaire-insights-8.2.1.js');
+const runtimePath = path.join(__dirname, '..', 'runtime', 'legionnaire-insights-8.2.2.js');
 const runtime = fs.readFileSync(runtimePath, 'utf8');
 const wrapper = fs.readFileSync(path.join(__dirname, '..', 'legionnaire-insights.user.js'), 'utf8');
 const breakpointMatch = runtime.match(/const DESKTOP_MIN_WIDTH = (\d+);/);
@@ -94,6 +94,80 @@ function extractFunction(source, name) {
   }
   throw new Error(`runtime function ${name} is not balanced`);
 }
+
+const clubContext = {};
+vm.runInNewContext(`
+  let currentSport = 'football';
+  const sport = () => currentSport;
+  const norm = (value) => String(value || '').replace(/\\s+/g, ' ').trim();
+  let clubByName = null;
+  let clubById = null;
+  let clubItems = [];
+  let clubMapSport = '';
+  let clubSource = '';
+  ${extractFunction(runtime, 'rebuildClubMaps')}
+  const fixture = [
+    { sport: 'football', id: 'cy-olympiakos-nicosia', name: 'אולימפיאקוס ניקוסיה', shortName: 'אולימפיאקוס', ovr: 70 },
+    { sport: 'football', id: 'gr-olympiacos', name: 'אולימפיאקוס', shortName: 'אולימפיאקוס', ovr: 84 },
+    { sport: 'basketball', id: 'gr-olympiacos', name: 'אולימפיאקוס', shortName: 'אולימפיאקוס', ovr: 90 },
+  ];
+  rebuildClubMaps(fixture, 'fixture');
+  globalThis.football = {
+    olympiacos: clubByName.get('אולימפיאקוס').ovr,
+    nicosia: clubByName.get('אולימפיאקוס ניקוסיה').ovr,
+    byId: clubById.get('gr-olympiacos').ovr,
+  };
+  currentSport = 'basketball';
+  rebuildClubMaps(fixture, 'fixture');
+  globalThis.basketball = {
+    olympiacos: clubByName.get('אולימפיאקוס').ovr,
+    byId: clubById.get('gr-olympiacos').ovr,
+  };
+`, clubContext);
+assert.equal(clubContext.football.olympiacos, 84, 'football Olympiacos must not inherit the basketball rating');
+assert.equal(clubContext.football.nicosia, 70, 'the full Nicosia name must remain independently addressable');
+assert.equal(clubContext.football.byId, 84, 'sport-scoped football IDs must resolve to the football club');
+assert.equal(clubContext.basketball.olympiacos, 90, 'basketball Olympiacos must retain its basketball rating');
+assert.equal(clubContext.basketball.byId, 90, 'sport-scoped basketball IDs must resolve to the basketball club');
+
+const wrapperClubContext = {};
+vm.runInNewContext(`
+  let activeSport = 'football';
+  const CLUB_CACHE_KEY = 'legionnaire-insights:club-cache-v4';
+  const norm = (value) => String(value || '').replace(/\\s+/g, ' ').trim();
+  const items = [
+    { sport: 'football', name: 'אולימפיאקוס ניקוסיה', shortName: 'אולימפיאקוס', ovr: 70 },
+    { sport: 'football', name: 'אולימפיאקוס', shortName: 'אולימפיאקוס', ovr: 84 },
+    { sport: 'basketball', name: 'אולימפיאקוס', shortName: 'אולימפיאקוס', ovr: 90 },
+  ];
+  const localStorage = {
+    getItem(key) {
+      if (key === CLUB_CACHE_KEY) return JSON.stringify({ items });
+      if (key === 'maslul-kariera:sport:v1') return activeSport;
+      return null;
+    },
+  };
+  ${extractFunction(wrapper, 'cachedClubAliases')}
+  globalThis.football = cachedClubAliases().get('אולימפיאקוס').ovr;
+  activeSport = 'basketball';
+  globalThis.basketball = cachedClubAliases().get('אולימפיאקוס').ovr;
+`, wrapperClubContext);
+assert.equal(wrapperClubContext.football, 84, 'single-club fallback must use the football full-name rating');
+assert.equal(wrapperClubContext.basketball, 90, 'single-club fallback must switch to the basketball rating');
+
+const sportDetectionContext = {};
+vm.runInNewContext(`
+  ${extractFunction(runtime, 'detectedClubSport')}
+  globalThis.results = [
+    detectedClubSport([['gr-olympiacos', 'אולימפיאקוס', 'אולימפיאקוס', 'GR']]),
+    detectedClubSport([['gr-olympiacos', 'אולימפיאקוס', 'אולימפיאקוס', 'gr']]),
+    detectedClubSport([{ id: 'il-football', source: { clubId: 1 } }]),
+    detectedClubSport([{ id: 'il-basketball', source: { provider: 'fixture' } }]),
+  ];
+`, sportDetectionContext);
+assert.deepEqual(Array.from(sportDetectionContext.results), ['football', 'basketball', 'football', 'basketball'], 'club tables must be assigned to their source sport');
+assert.match(runtime, /itemsById\.set\(`\$\{parsedSport\}:\$\{item\.id\}`/, 'identical club IDs must be retained separately per sport');
+assert.match(wrapper, /legionnaire-insights:club-cache-v4/, 'single-club fallback must read the sport-aware cache');
 
 const lookupContext = { unsafeWindow: undefined };
 vm.runInNewContext(`
