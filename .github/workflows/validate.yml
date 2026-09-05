@@ -49,6 +49,7 @@ jobs:
           test -n "$runtime_file"
           test -f "$runtime_file"
           test "$(grep -oF '__reactFiber$' "$runtime_file" | wc -l)" -eq 1
+          test "$(grep -oF '__reactProps$' "$runtime_file" | wc -l)" -eq 1
           ! grep -Eq 'fiber\.(child|sibling)' "$runtime_file"
           ! grep -Eq "querySelectorAll\(['\"]\*['\"]\)" "$runtime_file"
           ! grep -q 'setInterval' "$runtime_file"

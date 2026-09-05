@@ -56,7 +56,7 @@ storage.clear();
 storage.setItem(LEGACY, JSON.stringify({ choices: [] }));
 assert.equal(activeSaveRecord('football'), null, 'a stale object without a seed is not an active save');
 
-const runtimePath = path.join(__dirname, '..', 'runtime', 'legionnaire-insights-8.2.2.js');
+const runtimePath = path.join(__dirname, '..', 'runtime', 'legionnaire-insights-8.2.3.js');
 const runtime = fs.readFileSync(runtimePath, 'utf8');
 const wrapper = fs.readFileSync(path.join(__dirname, '..', 'legionnaire-insights.user.js'), 'utf8');
 const breakpointMatch = runtime.match(/const DESKTOP_MIN_WIDTH = (\d+);/);
@@ -77,8 +77,9 @@ assert.match(runtime, /toolbarAnchor\.insertBefore\(hud, trophyCase \|\| null\)/
 assert.doesNotMatch(runtime, /setInterval/, 'deployed runtime must not poll');
 assert.match(runtime, /document\.querySelectorAll\('\.decision \.option--personal'\)/, 'prediction lookup must start from visible decision cards');
 assert.match(runtime, /depth < 8/, 'React lookup must have a small hard traversal bound');
-assert.match(runtime, /fiber\.alternate \? \[fiber, fiber\.alternate\] : \[fiber\]/, 'prediction lookup must inspect the current React alternate');
-assert.match(runtime, /startsWith\(decisionPrefix\)/, 'prediction props must belong to the active seed and step');
+assert.match(runtime, /fiber\?\.alternate \? \[fiber, fiber\.alternate\] : \[fiber\]/, 'prediction lookup must inspect the host React alternate');
+assert.match(runtime, /__reactProps\$/, 'prediction lookup must identify the currently committed host props');
+assert.match(runtime, /decisionStepFromId/, 'prediction step must come from the live decision ID');
 assert.doesNotMatch(runtime, /fiber\.(child|sibling)/, 'prediction lookup must never traverse the React tree');
 assert.doesNotMatch(runtime, /querySelectorAll\(['"]\*['"]\)/, 'prediction lookup must never scan every DOM element');
 assert.match(wrapper, /^\/\/ @grant\s+unsafeWindow$/m, 'wrapper must expose the page bridge for Chrome and Firefox userscript sandboxes');
@@ -109,25 +110,37 @@ vm.runInNewContext(`
   const fixture = [
     { sport: 'football', id: 'cy-olympiakos-nicosia', name: 'אולימפיאקוס ניקוסיה', shortName: 'אולימפיאקוס', ovr: 70 },
     { sport: 'football', id: 'gr-olympiacos', name: 'אולימפיאקוס', shortName: 'אולימפיאקוס', ovr: 84 },
+    { sport: 'football', id: 'es-barcelona', name: 'ברצלונה', shortName: 'ברצלונה', ovr: 89 },
+    { sport: 'football', id: 'de-bayern', name: 'באיירן מינכן', shortName: 'באיירן', ovr: 90 },
     { sport: 'basketball', id: 'gr-olympiacos', name: 'אולימפיאקוס', shortName: 'אולימפיאקוס', ovr: 90 },
+    { sport: 'basketball', id: 'es-barcelona', name: 'ברצלונה', shortName: 'ברצלונה', ovr: 87 },
+    { sport: 'basketball', id: 'de-bayern-munich', name: 'באיירן מינכן', shortName: 'באיירן מינכן', ovr: 86 },
   ];
   rebuildClubMaps(fixture, 'fixture');
   globalThis.football = {
     olympiacos: clubByName.get('אולימפיאקוס').ovr,
     nicosia: clubByName.get('אולימפיאקוס ניקוסיה').ovr,
+    barcelona: clubByName.get('ברצלונה').ovr,
+    bayern: clubByName.get('באיירן מינכן').ovr,
     byId: clubById.get('gr-olympiacos').ovr,
   };
   currentSport = 'basketball';
   rebuildClubMaps(fixture, 'fixture');
   globalThis.basketball = {
     olympiacos: clubByName.get('אולימפיאקוס').ovr,
+    barcelona: clubByName.get('ברצלונה').ovr,
+    bayern: clubByName.get('באיירן מינכן').ovr,
     byId: clubById.get('gr-olympiacos').ovr,
   };
 `, clubContext);
 assert.equal(clubContext.football.olympiacos, 84, 'football Olympiacos must not inherit the basketball rating');
 assert.equal(clubContext.football.nicosia, 70, 'the full Nicosia name must remain independently addressable');
+assert.equal(clubContext.football.barcelona, 89, 'football Barcelona must retain its football rating');
+assert.equal(clubContext.football.bayern, 90, 'football Bayern must retain its football rating');
 assert.equal(clubContext.football.byId, 84, 'sport-scoped football IDs must resolve to the football club');
 assert.equal(clubContext.basketball.olympiacos, 90, 'basketball Olympiacos must retain its basketball rating');
+assert.equal(clubContext.basketball.barcelona, 87, 'basketball Barcelona must retain its basketball rating');
+assert.equal(clubContext.basketball.bayern, 86, 'basketball Bayern must retain its basketball rating even with a different ID');
 assert.equal(clubContext.basketball.byId, 90, 'sport-scoped basketball IDs must resolve to the basketball club');
 
 const wrapperClubContext = {};
@@ -138,7 +151,11 @@ vm.runInNewContext(`
   const items = [
     { sport: 'football', name: 'אולימפיאקוס ניקוסיה', shortName: 'אולימפיאקוס', ovr: 70 },
     { sport: 'football', name: 'אולימפיאקוס', shortName: 'אולימפיאקוס', ovr: 84 },
+    { sport: 'football', name: 'ברצלונה', shortName: 'ברצלונה', ovr: 89 },
+    { sport: 'football', name: 'באיירן מינכן', shortName: 'באיירן', ovr: 90 },
     { sport: 'basketball', name: 'אולימפיאקוס', shortName: 'אולימפיאקוס', ovr: 90 },
+    { sport: 'basketball', name: 'ברצלונה', shortName: 'ברצלונה', ovr: 87 },
+    { sport: 'basketball', name: 'באיירן מינכן', shortName: 'באיירן מינכן', ovr: 86 },
   ];
   const localStorage = {
     getItem(key) {
@@ -148,12 +165,20 @@ vm.runInNewContext(`
     },
   };
   ${extractFunction(wrapper, 'cachedClubAliases')}
-  globalThis.football = cachedClubAliases().get('אולימפיאקוס').ovr;
+  globalThis.football = {
+    olympiacos: cachedClubAliases().get('אולימפיאקוס').ovr,
+    barcelona: cachedClubAliases().get('ברצלונה').ovr,
+    bayern: cachedClubAliases().get('באיירן מינכן').ovr,
+  };
   activeSport = 'basketball';
-  globalThis.basketball = cachedClubAliases().get('אולימפיאקוס').ovr;
+  globalThis.basketball = {
+    olympiacos: cachedClubAliases().get('אולימפיאקוס').ovr,
+    barcelona: cachedClubAliases().get('ברצלונה').ovr,
+    bayern: cachedClubAliases().get('באיירן מינכן').ovr,
+  };
 `, wrapperClubContext);
-assert.equal(wrapperClubContext.football, 84, 'single-club fallback must use the football full-name rating');
-assert.equal(wrapperClubContext.basketball, 90, 'single-club fallback must switch to the basketball rating');
+assert.deepEqual({ ...wrapperClubContext.football }, { olympiacos: 84, barcelona: 89, bayern: 90 }, 'single-club fallback must keep football ratings');
+assert.deepEqual({ ...wrapperClubContext.basketball }, { olympiacos: 90, barcelona: 87, bayern: 86 }, 'single-club fallback must switch to basketball ratings');
 
 const sportDetectionContext = {};
 vm.runInNewContext(`
@@ -173,6 +198,7 @@ const lookupContext = { unsafeWindow: undefined };
 vm.runInNewContext(`
   const norm = (value) => String(value || '').replace(/\\s+/g, ' ').trim();
   ${extractFunction(runtime, 'propsMatchVisibleCard')}
+  ${extractFunction(runtime, 'decisionStepFromId')}
   ${extractFunction(runtime, 'localDecisionProps')}
   globalThis.lookup = localDecisionProps;
 `, lookupContext);
@@ -195,6 +221,8 @@ const staleOption = {
 };
 const currentProps = { decision: { id: 'fixture-seed-4-current' }, option: currentOption };
 const staleProps = { decision: { id: 'fixture-seed-3-previous' }, option: staleOption };
+const currentHostProps = { onClick() {} };
+const staleHostProps = { onClick() {} };
 const fakeCard = {
   wrappedJSObject: null,
   querySelector(selector) {
@@ -206,13 +234,22 @@ const fakeCard = {
       : [];
   },
 };
+fakeCard['__reactProps$fixture'] = currentHostProps;
 fakeCard['__reactFiber$fixture'] = {
-  memoizedProps: null,
-  return: { memoizedProps: staleProps, alternate: { memoizedProps: currentProps } },
+  memoizedProps: staleHostProps,
+  return: { memoizedProps: staleProps },
+  alternate: { memoizedProps: currentHostProps, return: { memoizedProps: currentProps } },
 };
-assert.equal(lookupContext.lookup(fakeCard, 0, 'fixture-seed', 4).option.id, currentOption.id, 'lookup must reject stale props and select the alternate matching the active decision');
-fakeCard['__reactFiber$fixture'].return.alternate.memoizedProps = staleProps;
-assert.equal(lookupContext.lookup(fakeCard, 0, 'fixture-seed', 4), null, 'lookup must fail closed when neither fiber belongs to the active decision');
+const saveRecords = [
+  { key: FOOTBALL, save: { seed: 'stale-save', choices: Array(12).fill('old') } },
+  { key: LEGACY, save: { seed: 'fixture-seed', choices: Array(9).fill('choice') } },
+];
+const liveContext = lookupContext.lookup(fakeCard, 0, saveRecords);
+assert.equal(liveContext.props.option.id, currentOption.id, 'lookup must select the component attached to the committed host props');
+assert.equal(liveContext.record.key, LEGACY, 'lookup must select the save whose seed owns the live decision');
+assert.equal(liveContext.step, 4, 'decision step must come from the live decision ID, not the nine saved choices');
+fakeCard['__reactFiber$fixture'].alternate.return.memoizedProps = { ...currentProps, decision: { id: 'unknown-seed-4-current' } };
+assert.equal(lookupContext.lookup(fakeCard, 0, saveRecords), null, 'lookup must fail closed when no active save owns the committed decision');
 
 function seedHash(text) {
   let state = 2166136261 >>> 0;
@@ -248,7 +285,7 @@ assert.equal(predictedIndex('fixture-9', 7, threeOutcomeOption), 1, 'three-outco
 assert.equal(predictedIndex('fixture-6', 7, threeOutcomeOption), 2, 'three-outcome preview selects the final band');
 assert.equal(JSON.stringify(threeOutcomeOption), originalOutcomes, 'prediction must not mutate outcomes or probabilities');
 assert.match(runtime, /localStorage\.getItem\(PREDICTIONS_KEY\) === '1'/, 'predictions must default off and require explicit opt-in');
-assert.match(runtime, /Array\.isArray\(save\.choices\) \? save\.choices\.length : null/, 'prediction step must use the active save replay cursor');
+assert.doesNotMatch(runtime, /function decisionStep\(save\)/, 'prediction must not equate saved choice count with the career step');
 assert.match(runtime, /היא אינה משנה את המשחק או את השמירה/, 'the UI must disclose that preview is read-only');
 
 console.log('v8 UI logic tests: OK');

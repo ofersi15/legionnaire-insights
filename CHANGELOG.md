@@ -1,5 +1,13 @@
 # Changelog
 
+## 8.2.3 - 2026-09-05
+
+- Fixed seed previews disappearing in real careers after auxiliary agent or sponsor choices. Saved `choices.length` is a replay cursor, not the game's season step; the preview now parses the actual step from the live decision ID.
+- When both a stale sport-specific save and the live legacy football save exist, the preview now tests each current save seed and selects the one that owns the rendered decision.
+- Uses React's current DOM props to identify the committed host fiber before the same bounded eight-level parent walk. This keeps stale alternates from winning without scanning the React tree.
+- Added regression coverage where nine saved choices correspond to decision step four, the preferred save is stale, and the current component lives on the host alternate.
+- Audited the full live club database: 15 IDs and 40 exact names are shared across sports. The 8.2.2 sport separation covers all of them, including football/basketball Barcelona (89/87) and Bayern Munich (90/86).
+
 ## 8.2.2 - 2026-09-04
 
 - Fixed cross-sport club ratings overwriting one another in the local club cache. The live bundle gives football Olympiacos OVR 84 and basketball Olympiacos OVR 90 under the same internal ID; the UI could therefore show 90 on a football offer.

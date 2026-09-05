@@ -39,7 +39,7 @@ node --check legionnaire-insights.user.js
 
 The same syntax and metadata checks run automatically in GitHub Actions.
 
-The deployed runtime must not scan from the React root or traverse child/sibling fibers. Seed preview may only start at a visible probabilistic option card and walk a small, hard-bounded `return` chain. It may inspect each node's corresponding `alternate`, but must accept props only after matching the active seed/step decision prefix, visible option label and all outcome labels; keep the CI guard precise to that exception.
+The deployed runtime must not scan from the React root or traverse child/sibling fibers. Seed preview may only start at a visible probabilistic option card, use the DOM's current React props to select its committed host fiber, and walk a small, hard-bounded `return` chain. Accept props only after a current save seed owns the live decision ID and the visible option/outcome labels match. Parse the season step from that decision ID; `choices.length` can include extra agent/sponsor choices.
 
 Club cache entries must stay sport-tagged and club maps must contain only the active sport. Index exact full names before short aliases so aliases cannot overwrite another club's exact name.
 
