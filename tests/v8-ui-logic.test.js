@@ -3,6 +3,7 @@
 const assert = require('node:assert/strict');
 const fs = require('node:fs');
 const path = require('node:path');
+const vm = require('node:vm');
 
 class StorageMock {
   constructor() { this.map = new Map(); }
@@ -55,7 +56,7 @@ storage.clear();
 storage.setItem(LEGACY, JSON.stringify({ choices: [] }));
 assert.equal(activeSaveRecord('football'), null, 'a stale object without a seed is not an active save');
 
-const runtimePath = path.join(__dirname, '..', 'runtime', 'legionnaire-insights-8.2.0.js');
+const runtimePath = path.join(__dirname, '..', 'runtime', 'legionnaire-insights-8.2.1.js');
 const runtime = fs.readFileSync(runtimePath, 'utf8');
 const wrapper = fs.readFileSync(path.join(__dirname, '..', 'legionnaire-insights.user.js'), 'utf8');
 const breakpointMatch = runtime.match(/const DESKTOP_MIN_WIDTH = (\d+);/);
@@ -76,9 +77,68 @@ assert.match(runtime, /toolbarAnchor\.insertBefore\(hud, trophyCase \|\| null\)/
 assert.doesNotMatch(runtime, /setInterval/, 'deployed runtime must not poll');
 assert.match(runtime, /document\.querySelectorAll\('\.decision \.option--personal'\)/, 'prediction lookup must start from visible decision cards');
 assert.match(runtime, /depth < 8/, 'React lookup must have a small hard traversal bound');
+assert.match(runtime, /fiber\.alternate \? \[fiber, fiber\.alternate\] : \[fiber\]/, 'prediction lookup must inspect the current React alternate');
+assert.match(runtime, /startsWith\(decisionPrefix\)/, 'prediction props must belong to the active seed and step');
 assert.doesNotMatch(runtime, /fiber\.(child|sibling)/, 'prediction lookup must never traverse the React tree');
 assert.doesNotMatch(runtime, /querySelectorAll\(['"]\*['"]\)/, 'prediction lookup must never scan every DOM element');
 assert.match(wrapper, /^\/\/ @grant\s+unsafeWindow$/m, 'wrapper must expose the page bridge for Chrome and Firefox userscript sandboxes');
+
+function extractFunction(source, name) {
+  const start = source.indexOf(`function ${name}(`);
+  assert.notEqual(start, -1, `runtime function ${name} must exist`);
+  const bodyStart = source.indexOf('{', start);
+  let depth = 0;
+  for (let index = bodyStart; index < source.length; index++) {
+    if (source[index] === '{') depth++;
+    else if (source[index] === '}' && --depth === 0) return source.slice(start, index + 1);
+  }
+  throw new Error(`runtime function ${name} is not balanced`);
+}
+
+const lookupContext = { unsafeWindow: undefined };
+vm.runInNewContext(`
+  const norm = (value) => String(value || '').replace(/\\s+/g, ' ').trim();
+  ${extractFunction(runtime, 'propsMatchVisibleCard')}
+  ${extractFunction(runtime, 'localDecisionProps')}
+  globalThis.lookup = localDecisionProps;
+`, lookupContext);
+
+const currentOption = {
+  id: 'visible-option',
+  label: 'האפשרות הנוכחית',
+  outcomes: [
+    { probability: 0.7, resultLabel: 'התוצאה הטובה' },
+    { probability: 0.3, resultLabel: 'התוצאה הרעה' },
+  ],
+};
+const staleOption = {
+  id: 'previous-option',
+  label: currentOption.label,
+  outcomes: [
+    { probability: 0.5, resultLabel: currentOption.outcomes[0].resultLabel },
+    { probability: 0.5, resultLabel: currentOption.outcomes[1].resultLabel },
+  ],
+};
+const currentProps = { decision: { id: 'fixture-seed-4-current' }, option: currentOption };
+const staleProps = { decision: { id: 'fixture-seed-3-previous' }, option: staleOption };
+const fakeCard = {
+  wrappedJSObject: null,
+  querySelector(selector) {
+    return selector === '.option__name' ? { textContent: currentOption.label } : null;
+  },
+  querySelectorAll(selector) {
+    return selector === '.pill'
+      ? currentOption.outcomes.map((outcome) => ({ firstElementChild: { textContent: outcome.resultLabel } }))
+      : [];
+  },
+};
+fakeCard['__reactFiber$fixture'] = {
+  memoizedProps: null,
+  return: { memoizedProps: staleProps, alternate: { memoizedProps: currentProps } },
+};
+assert.equal(lookupContext.lookup(fakeCard, 0, 'fixture-seed', 4).option.id, currentOption.id, 'lookup must reject stale props and select the alternate matching the active decision');
+fakeCard['__reactFiber$fixture'].return.alternate.memoizedProps = staleProps;
+assert.equal(lookupContext.lookup(fakeCard, 0, 'fixture-seed', 4), null, 'lookup must fail closed when neither fiber belongs to the active decision');
 
 function seedHash(text) {
   let state = 2166136261 >>> 0;

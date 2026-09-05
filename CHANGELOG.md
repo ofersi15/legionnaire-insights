@@ -1,5 +1,11 @@
 # Changelog
 
+## 8.2.1 - 2026-09-04
+
+- Fixed seed previews reading stale React props after a decision-card commit. React can retain the previous render on the DOM-linked fiber and place the current render on its `alternate`, which could produce a valid calculation for the wrong option.
+- The bounded lookup now checks both fiber versions at each of the same eight parent levels and accepts one only when its decision ID matches the active seed/step and its option label, outcome count and every outcome label exactly match the rendered card. Ambiguous or unavailable props fail closed with no marker.
+- Added a regression fixture where the DOM-linked fiber deliberately contains a previous decision and the alternate contains the visible one; first/middle/last deterministic outcome tests remain unchanged.
+
 ## 8.2.0 - 2026-09-04
 
 - Added an opt-in, read-only seed outcome preview. `כלים / Sync` now includes `תחזית: כבויה/פעילה`; when enabled, the outcome that the current seed will roll is outlined and marked `🔮 נקבע` (`🔮` on narrow mobile).

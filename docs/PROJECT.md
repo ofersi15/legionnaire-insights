@@ -3,7 +3,7 @@
 ## Current state
 
 - Userscript: `legionnaire-insights.user.js`
-- Current release: `8.2.0`
+- Current release: `8.2.1`
 - Target: `https://www.legionnaire.xyz/*`
 - Desktop: Chrome; mobile: Firefox Android; both use Tampermonkey.
 - Code delivery: public GitHub raw URL in `@updateURL` and `@downloadURL`.
@@ -34,7 +34,7 @@ The game is a React SPA with no account/backend. Saves are event-sourced in orig
 
 `legionnaire-insights.user.js` `@require`s exactly one runtime:
 
-- `runtime/legionnaire-insights-8.2.0.js`
+- `runtime/legionnaire-insights-8.2.1.js`
 
 The active install does **not** load `legionnaire-insights-core-7.2.0.js`, any `perf-gate-*`, any `native-ui-7.x`, or `diagnostics-7.10.0.js`. Those files remain in repository history only.
 
@@ -48,7 +48,7 @@ V8 is intentionally event-driven:
 
 HUD/toolbar and club UI refresh after real user interaction, visibility changes, a coalesced resize frame, a short startup burst and the bounded late club recovery described above. There is no continuous gameplay watcher. At 900px+ with a fine pointer, the toolbar is inserted immediately before the player card's trophy case; narrower or coarse-pointer layouts retain the draggable floating HUD.
 
-Seed preview starts at visible probabilistic cards, uses Tampermonkey's page bridge where needed, and walks at most eight `return` links to their `decision` and `option` props. It never walks child/sibling fibers or the React root. Step is the active save's ordered `choices.length`, the same replay cursor used by the game; LI reproduces the seeded cumulative roll without mutation.
+Seed preview starts only at visible probabilistic cards and checks at most eight `return` levels, including each `alternate`. It accepts props only when the decision ID matches the active seed/step and the option/outcome labels match the rendered card; otherwise no marker. It never walks child/sibling fibers or the React root. Step is the active save's `choices.length`; LI reproduces the roll without mutation.
 
 The deployable wrapper contains only small compatibility bridges around the single runtime: Tampermonkey update handoff plus bounded recovery for late/single-club cards. Feature/state/sync logic remains in the runtime.
 
