@@ -1,5 +1,17 @@
 # Changelog
 
+## 8.4.0 - 2026-09-08
+
+- Added first-class coach-career support for football and basketball. LI now identifies direct coach saves, keeps the coach HUD/desktop toolbar free of player-only POT and Agents/Seed Finder controls, and exposes a compact coach-details sheet instead.
+- Fixed compact `OVR63` tiles being missed because React renders the caption and number without a text boundary. Coach rating is now shown reliably on mobile and desktop.
+- Fixed deterministic previews in coach decisions to use the game's real `seed-step-mgr-apply-optionId` RNG namespace. Added exact DOM fallbacks for coach salary negotiations and summer training choices whose custom cards do not expose the normal personal-option component shape.
+- Added read-only live-match call guidance from the current game bundle: the three visible calls are labelled with their real fixed meter effects (`+14`, `+5`, `-7`). No choice, RNG state or save is changed.
+- Repositioned LI club OVR badges inside coach offer cards so they no longer cover the game's new-offer or fit markers.
+- Fixed missing OVR badges on coach offers below the initial viewport. The sparse pass now covers every already-rendered decision card, with no interval, observer or scroll polling.
+- Hardened Sync active-save merging: a remote save advances local state only when seed and career mode match and the local choices are an exact prefix. Same-seed divergent branches and player/coach saves stay local.
+- Preserved distinct completed player and coach histories that share a seed instead of collapsing them to one record.
+- Revalidated isolated football and basketball coach careers against the live 2026-09-08 game bundle, including summer spending, salary negotiation, season replay, sponsorship, desktop/mobile coach UI and multi-offer club ratings.
+
 ## 8.2.4 - 2026-09-05
 
 - Fixed basketball careers created from Seed Finder receiving the football position `ST`, which makes the game fail when it tries to simulate the first season. New basketball seed saves now default to `PG` and preserve any valid basketball position.

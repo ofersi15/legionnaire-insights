@@ -56,7 +56,7 @@ storage.clear();
 storage.setItem(LEGACY, JSON.stringify({ choices: [] }));
 assert.equal(activeSaveRecord('football'), null, 'a stale object without a seed is not an active save');
 
-const runtimePath = path.join(__dirname, '..', 'runtime', 'legionnaire-insights-8.2.4.js');
+const runtimePath = path.join(__dirname, '..', 'runtime', 'legionnaire-insights-8.4.0.js');
 const runtime = fs.readFileSync(runtimePath, 'utf8');
 const wrapper = fs.readFileSync(path.join(__dirname, '..', 'legionnaire-insights.user.js'), 'utf8');
 const breakpointMatch = runtime.match(/const DESKTOP_MIN_WIDTH = (\d+);/);
@@ -73,9 +73,28 @@ assert.equal(desktopLayout(1200, false), false, 'large coarse-pointer devices ke
 assert.match(runtime, /data-toolbar-action="details"/, 'desktop toolbar exposes Details');
 assert.match(runtime, /data-toolbar-action="seed"/, 'desktop toolbar exposes Seed Finder');
 assert.match(runtime, /data-toolbar-action="main"/, 'desktop toolbar exposes tools and Sync');
+assert.match(runtime, /careerMode\(save\)/, 'runtime must explicitly distinguish player and coach saves');
+assert.match(runtime, /match\(\/\\d\{2,3\}\//, 'compact OVR text without a word boundary must be detected');
+assert.match(runtime, /mgr-apply/, 'coach previews must use the manager RNG namespace');
+assert.match(runtime, /mgr-stay-ask-wage-\$\{step\}/, 'manager salary negotiation must have an exact DOM fallback ID');
+assert.match(runtime, /mgr-train-\$\{slug\}-\$\{step\}/, 'manager summer decisions must have an exact DOM fallback ID');
+assert.match(runtime, /המהלך הטוב · \+14/, 'live match previews must expose the exact best-call meter delta');
+assert.match(runtime, /ללא POT של שחקן/, 'coach details must explicitly omit irrelevant player POT');
+assert.match(runtime, /if \(!rendered\(card\) \|\| card\.closest/, 'club OVR pass must include rendered cards below the viewport fold');
+
+const managerStepContext = {};
+vm.runInNewContext(`
+  ${extractFunction(runtime, 'inferredManagerStep')}
+  globalThis.result = inferredManagerStep({ choices: [
+    'mgr-formation-3-4-1-2', 'mgr-job-il-5245', 'mgr-scout-fb-43-1',
+    'mgr-stay-2', 'mgr-shop-medical-3'
+  ] });
+`, managerStepContext);
+assert.equal(managerStepContext.result, 4, 'manager replay cursor must advance from the latest season-ending shop choice');
+
 assert.match(runtime, /toolbarAnchor\.insertBefore\(hud, trophyCase \|\| null\)/, 'toolbar is inserted inside the player card before the trophy case');
 assert.doesNotMatch(runtime, /setInterval/, 'deployed runtime must not poll');
-assert.match(runtime, /document\.querySelectorAll\('\.decision \.option--personal'\)/, 'prediction lookup must start from visible decision cards');
+assert.match(runtime, /document\.querySelectorAll\('\.decision \.option'\)/, 'prediction lookup must start from visible decision cards');
 assert.match(runtime, /depth < 8/, 'React lookup must have a small hard traversal bound');
 assert.match(runtime, /fiber\?\.alternate \? \[fiber, fiber\.alternate\] : \[fiber\]/, 'prediction lookup must inspect the host React alternate');
 assert.match(runtime, /__reactProps\$/, 'prediction lookup must identify the currently committed host props');

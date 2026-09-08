@@ -45,22 +45,33 @@ function mergeNumberKey(key, remoteLedger) {
 }
 function unionBySeed(a, b) {
   const map = new Map();
-  for (const item of a || []) map.set(item && item.seed != null ? item.seed : JSON.stringify(item), item);
+  const recordKey = (item) => {
+    if (!item || item.seed == null) return JSON.stringify(item);
+    const mode = item.coachOnly === true ? 'coach' : 'player';
+    const branch = Array.isArray(item.choices) ? JSON.stringify(item.choices) : JSON.stringify(item);
+    return `${item.seed}|${mode}|${branch}`;
+  };
+  for (const item of a || []) map.set(recordKey(item), item);
   for (const item of b || []) {
-    const key = item && item.seed != null ? item.seed : JSON.stringify(item);
+    const key = recordKey(item);
     if (!map.has(key)) map.set(key, item);
   }
   return [...map.values()];
+}
+function careerMode(save) { return save && (save.career === 'coach' || save.manager === true) ? 'coach' : 'player'; }
+function choicesArePrefix(shorter, longer) {
+  return Array.isArray(shorter) && Array.isArray(longer) && shorter.length <= longer.length
+    && shorter.every((choice, index) => JSON.stringify(choice) === JSON.stringify(longer[index]));
 }
 function chooseActiveSave(targetRaw, sourceRaw) {
   if (!targetRaw) return sourceRaw;
   if (!sourceRaw || targetRaw === sourceRaw) return targetRaw;
   try {
     const target = JSON.parse(targetRaw), source = JSON.parse(sourceRaw);
-    if (target && source && target.seed === source.seed) {
-      const a = Array.isArray(target.choices) ? target.choices.length : 0;
-      const b = Array.isArray(source.choices) ? source.choices.length : 0;
-      return b > a ? sourceRaw : targetRaw;
+    if (target && source && target.seed === source.seed && careerMode(target) === careerMode(source)) {
+      const a = Array.isArray(target.choices) ? target.choices : [];
+      const b = Array.isArray(source.choices) ? source.choices : [];
+      return b.length > a.length && choicesArePrefix(a, b) ? sourceRaw : targetRaw;
     }
   } catch {}
   return targetRaw;
@@ -115,8 +126,11 @@ function deviceFilename(id) { return `legionnaire-device-${id}.snapshot.json`; }
   const remote = JSON.stringify({ seed: 'same', choices: ['a', 'b', 'c'] });
   assert.equal(chooseActiveSave(local, remote), remote, 'same-seed longer save must advance');
   assert.equal(chooseActiveSave(local, JSON.stringify({ seed: 'other', choices: ['x', 'y'] })), local, 'different seeds must keep local');
+  assert.equal(chooseActiveSave(local, JSON.stringify({ seed: 'same', choices: ['different', 'branch'] })), local, 'divergent same-seed branches must keep local');
+  assert.equal(chooseActiveSave(local, JSON.stringify({ seed: 'same', career: 'coach', manager: true, choices: ['a', 'b'] })), local, 'coach and player saves must never overwrite each other');
 
   assert.deepEqual(unionBySeed([{ seed: 'a' }, { seed: 'b' }], [{ seed: 'b' }, { seed: 'c' }]).map((x) => x.seed), ['a', 'b', 'c']);
+  assert.equal(unionBySeed([{ seed: 'same', coachOnly: false, choices: ['player'] }], [{ seed: 'same', coachOnly: true, choices: ['coach'] }]).length, 2, 'player and coach histories with one seed must both survive');
 
   localStorage.setItem(DEVICE_ID_KEY, 'device-a');
   localStorage.setItem('maslul-kariera:careers-completed:v1', '1');

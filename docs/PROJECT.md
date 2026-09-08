@@ -3,7 +3,7 @@
 ## Current state
 
 - Userscript: `legionnaire-insights.user.js`
-- Current release: `8.2.4`
+- Current release: `8.4.0`
 - Target: `https://www.legionnaire.xyz/*`
 - Desktop: Chrome; mobile: Firefox Android; both use Tampermonkey.
 - Code delivery: public GitHub raw URL in `@updateURL` and `@downloadURL`.
@@ -13,15 +13,16 @@ The game is a React SPA with no account/backend. Saves are event-sourced in orig
 
 ## Features
 
-- Fixed career POT is derived from the active seed. Mobile/coarse-pointer layouts use the tiny draggable `LI · POT NN` HUD; desktop uses a 30px toolbar inside the player card with POT/gap, Details, Seed Finder and Tools / Sync.
+- Player POT is derived from the active seed. Coach careers are detected explicitly and show `LI · מאמן · rating` without player POT; coach details omit player-only fields and tools.
 - Active-save lookup checks the sport-specific v2 save first, then the legacy `maslul-kariera:save:v1` fallback used by real football sessions, then the other sport save as a final compatibility fallback.
 - Career-screen detection prefers a visible OVR tile and falls back to rendered career text on Firefox/React layouts where the OVR caption is not cleanly discoverable in the DOM. A save alone is never enough to show POT.
 - Outside a career screen the HUD shows only `LI`; stale save data must never expose a fake POT.
 - Mobile default HUD position is near the lower-left of the player header (`left: 20px`, `top: 62px`); dragging persists a custom position.
 - Tapping the HUD opens one mobile-first bottom sheet. The legacy 7.2 overlay/panel is no longer loaded.
-- Bottom-sheet sections: player Details, native Seed Finder, Agents, and Sync/Settings.
-- An opt-in seed preview marks the predetermined outcome on probabilistic personal decisions. It is read-only, defaults off and supports two or more outcomes.
-- Club-choice cards show only `OVR NN`, with the strongest visible offer outlined. Tier text is intentionally omitted.
+- Bottom-sheet sections are mode-aware: player Details/Seed Finder/Agents, coach Details, shared deterministic Preview and Sync/Settings.
+- An opt-in seed preview marks predetermined probabilistic outcomes. Player decisions use `seed-step-apply-optionId`; coach decisions use `seed-step-mgr-apply-optionId`. Custom coach salary/summer cards use narrow, game-source-derived fallbacks.
+- Live coach-match calls are annotated from the active bundle with their fixed meter effects: best `+14`, reasonable `+5`, risky `-7`.
+- Club-choice cards show only `OVR NN`, with the strongest visible offer outlined. Coach badges sit in normal card flow and every rendered offer is covered, including cards initially below the viewport.
 - Club data is cached after the first bundle parse and separated by sport, including identical IDs. Full names take precedence over short aliases; agent preferred-club IDs resolve from the active sport's map.
 - Club annotation is incremental and normally uses sparse post-interaction retries over 2.4 seconds. Firefox Android can render transfer cards after that window, so the wrapper arms one bounded late refresh after the user becomes idle and one final recovery only if no LI club badge appeared.
 - End-of-cycle screens can contain exactly one club offer beside Retirement. Because the runtime only compares 2+ offers, the wrapper has a narrow cached-club fallback that annotates exactly one club with `OVR NN` without applying a “strongest” outline.
@@ -34,7 +35,7 @@ The game is a React SPA with no account/backend. Saves are event-sourced in orig
 
 `legionnaire-insights.user.js` `@require`s exactly one runtime:
 
-- `runtime/legionnaire-insights-8.2.4.js`
+- `runtime/legionnaire-insights-8.4.0.js`
 
 The active install does **not** load `legionnaire-insights-core-7.2.0.js`, any `perf-gate-*`, any `native-ui-7.x`, or `diagnostics-7.10.0.js`. Those files remain in repository history only.
 
@@ -48,7 +49,7 @@ V8 is intentionally event-driven:
 
 HUD/toolbar and club UI refresh after real user interaction, visibility changes, a coalesced resize frame, a short startup burst and the bounded late club recovery described above. There is no continuous gameplay watcher. At 900px+ with a fine pointer, the toolbar is inserted immediately before the player card's trophy case; narrower or coarse-pointer layouts retain the draggable floating HUD.
 
-Seed preview starts at visible probabilistic cards, selects the committed host fiber from current DOM props and walks at most eight `return` levels. A current save seed must own the live decision ID and all visible labels must match. It never walks child/sibling fibers or the React root. Step comes from the decision ID because auxiliary choices inflate `choices.length`. LI reproduces the roll without mutation.
+Seed preview starts at visible probabilistic cards, selects the committed host fiber from current DOM props and walks at most eight `return` levels. A current save seed must own the live decision ID and all visible outcomes must match. It never walks child/sibling fibers or the React root. Step comes from the decision ID; narrow custom coach fallbacks infer the next season step only from recognized manager choice IDs. LI reproduces the roll without mutation.
 
 The deployable wrapper contains only small compatibility bridges around the single runtime: Tampermonkey update handoff plus bounded recovery for late/single-club cards. Feature/state/sync logic remains in the runtime.
 
@@ -56,11 +57,11 @@ The deployable wrapper contains only small compatibility bridges around the sing
 
 | Key suffix | Meaning | Merge rule |
 | --- | --- | --- |
-| `football:save:v2` | Football active-save key on newer layouts | Same seed: longer `choices`; different seeds keep local |
-| `save:v1` | Legacy/current football active-save fallback seen on real devices | Same rule |
-| `basketball:save:v2` | Basketball active career | Same rule |
-| `football:careers:v1` | Completed football careers | Union by `seed` |
-| `basketball:careers:v1` | Basketball history | Union by `seed` |
+| `football:save:v2` | Football player or coach active save | Advance only for same seed/mode and exact choice prefix |
+| `save:v1` | Legacy football active-save fallback | Same rule |
+| `basketball:save:v2` | Basketball player or coach active save | Same rule |
+| `football:careers:v1` | Completed football careers | Preserve seed + player/coach branch |
+| `basketball:careers:v1` | Basketball history | Preserve seed + player/coach branch |
 | `collection:v1` | Football collection/stats | Per-device numeric ledger |
 | `basketball:collection:v2` | Basketball collection/stats | Per-device numeric ledger |
 | `careers-completed:v1` | Combined completed count | Per-device numeric ledger |
@@ -76,8 +77,8 @@ V8 preserves the existing cloud data format and merge invariants:
 - gzip/base64 transport when supported;
 - SHA-256 payload verification;
 - cumulative numbers/maps merge through per-device ledgers;
-- completed-career arrays union by seed;
-- same-seed active saves advance to the longer `choices` list;
+- completed-career arrays preserve distinct player/coach and choice branches;
+- active saves advance only when seed/mode match and local choices are an exact prefix;
 - different active-career seeds never overwrite a local active career automatically;
 - legacy v6.15 seven-file import remains as a fallback if no v3 snapshots exist.
 
@@ -100,12 +101,6 @@ GitHub Actions runs:
 
 - JavaScript syntax checks for wrapper/runtime/tests;
 - Tampermonkey metadata checks;
-- v8 sync compatibility tests covering compression round-trip, checksum rejection, idempotent repeated ledger merge, independent device filenames, career-history union and same-seed advancement;
+- v8 sync compatibility tests covering compression, checksums, idempotent ledgers, device files and branch-safe career merging;
 - active-save fallback tests for the sport-specific and legacy football save keys;
 - architecture guards requiring one runtime, no intervals and only the bounded card-local React access used by seed preview.
-
-## Probabilistic-decision research
-
-The active bundle renders personal cards with `onClick: () => onChoose(option.id)`. The one-argument callback finds the original pending option, derives an RNG from `seed + step + optionId`, and samples its outcomes cumulatively. Saves record only ordered choice IDs and replay outcomes from the seed.
-
-The research branch's option-clone Candidates A/B therefore cannot reach the handler. A transient mutation would not survive refresh. Forcing remains research-only until it has a replay-safe representation without a global RNG patch, continuous React scan or save corruption.

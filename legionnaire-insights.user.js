@@ -1,8 +1,8 @@
 // ==UserScript==
 // @name         Legionnaire Insights
 // @namespace    legionnaire-insights
-// @version      8.2.4
-// @description  Seed outcome previews, responsive Legionnaire UI, club strength, seed tools and sparse conflict-safe cloud sync.
+// @version      8.4.0
+// @description  Player and coach insights, deterministic previews, club strength and branch-safe sparse cloud sync.
 // @match        https://www.legionnaire.xyz/*
 // @grant        GM_xmlhttpRequest
 // @grant        GM_getValue
@@ -13,7 +13,7 @@
 // @connect      api.github.com
 // @connect      gist.githubusercontent.com
 // @connect      raw.githubusercontent.com
-// @require      https://raw.githubusercontent.com/ofersi15/legionnaire-insights/main/runtime/legionnaire-insights-8.2.4.js
+// @require      https://raw.githubusercontent.com/ofersi15/legionnaire-insights/main/runtime/legionnaire-insights-8.4.0.js
 // @homepageURL  https://github.com/ofersi15/legionnaire-insights
 // @source       https://github.com/ofersi15/legionnaire-insights
 // @updateURL    https://raw.githubusercontent.com/ofersi15/legionnaire-insights/main/legionnaire-insights.user.js
