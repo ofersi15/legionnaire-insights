@@ -15,7 +15,7 @@ Evidence came from the live game bundle `index-C6NZkW9Y.js`, isolated browser pl
 - Football and basketball club data overlap in names and IDs, so lookups and caches must remain sport-qualified.
 - Sync must preserve player/coach and divergent choice branches. An active save may advance only for the same seed/mode and an exact local-choice prefix.
 
-## Shipped in 8.4–8.5.2
+## Shipped in 8.4–8.5.3
 
 - Coach-aware HUD, details and navigation; player-only information suppressed.
 - Coach RNG namespace for standard deterministic previews, with narrow salary/summer fallbacks.
@@ -25,6 +25,7 @@ Evidence came from the live game bundle `index-C6NZkW9Y.js`, isolated browser pl
 - Firefox Android event cards now have a bundle-indexed fallback keyed by sport, title, option, outcome/effect signature and probability. Verified routine labels are available before the bundle fetch, and mobile forecast markers overlay compact pills so they are not clipped.
 - 8.5.2 replays the real manager season cursor instead of treating setup choices as seasons. It covers direct starts, source-indexed and basketball-only events, scouting/sales, salary/routine choices and formation switches; rendered choices below the viewport are decorated too.
 - The card-local React route now begins at every decision button, including scout cards, and targets probability bands rather than assuming one visual pill per outcome.
+- 8.5.3 identifies current careers from `career: "player"|"coach"`; the game's shared `manager: true` field no longer misclassifies player careers.
 
 The 8.5.2 verification reused the unchanged live asset `https://www.legionnaire.xyz/assets/index-C6NZkW9Y.js` (recorded SHA-256 `AEBD7D0C8429CD5D2241CD8E805289BEC8DA851C98C2BC014BBC0E907AD8A136`). Two direct coach careers in each sport were played in the isolated sandbox (both football careers and one basketball career reached age 70; the other basketball career ended through its normal game path). Forecast coverage was checked on every encountered probabilistic button, and selected forecasts were compared with the roulette's landed outcome index. The run exposed and then closed gaps in first-season cursor inference, below-fold options, scout cards, sale follow-ups, formation switches and basketball-only event classification.
 

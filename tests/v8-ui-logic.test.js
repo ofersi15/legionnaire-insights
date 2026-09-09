@@ -56,9 +56,19 @@ storage.clear();
 storage.setItem(LEGACY, JSON.stringify({ choices: [] }));
 assert.equal(activeSaveRecord('football'), null, 'a stale object without a seed is not an active save');
 
-const runtimePath = path.join(__dirname, '..', 'runtime', 'legionnaire-insights-8.5.2.js');
+const runtimePath = path.join(__dirname, '..', 'runtime', 'legionnaire-insights-8.5.3.js');
 const runtime = fs.readFileSync(runtimePath, 'utf8');
 const wrapper = fs.readFileSync(path.join(__dirname, '..', 'legionnaire-insights.user.js'), 'utf8');
+const careerModeContext = {};
+vm.runInNewContext(`${extractFunction(runtime, 'careerMode')}
+  globalThis.results = [
+    careerMode({ career: 'player', manager: true, choices: [] }),
+    careerMode({ career: 'coach', manager: true, choices: [] }),
+    careerMode({ manager: true, choices: [] }),
+    careerMode({ choices: ['mgr-philosophy-attacking'] }),
+  ];`, careerModeContext);
+assert.deepEqual(Array.from(careerModeContext.results), ['player', 'coach', 'player', 'coach'],
+  'career mode must trust the explicit career field, ignore the shared manager flag, and narrowly recognize legacy coach saves');
 const breakpointMatch = runtime.match(/const DESKTOP_MIN_WIDTH = (\d+);/);
 assert.ok(breakpointMatch, 'desktop breakpoint must be explicit and testable');
 const desktopMinWidth = Number(breakpointMatch[1]);

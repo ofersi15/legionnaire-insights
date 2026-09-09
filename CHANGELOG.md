@@ -1,5 +1,10 @@
 # Changelog
 
+## 8.5.3 - 2026-09-09
+
+- Fixed player careers being displayed as coach careers. The game writes `manager: true` into both player and coach saves; LI now trusts the explicit `career` field and uses only a narrow manager-setup choice fallback for older coach saves.
+- Added UI and Sync regressions proving that an explicit player save retains player POT/tools even when the shared `manager` flag is true, while coach and legacy coach saves remain branch-safe.
+
 ## 8.5.2 - 2026-09-09
 
 - Fixed missing or shifted coach forecasts by replaying the real manager season cursor from saved choice IDs. Direct starts no longer count philosophy/formation setup as seasons; event, scouting, sale, shop, transfer and formation decisions now advance the cursor correctly.
