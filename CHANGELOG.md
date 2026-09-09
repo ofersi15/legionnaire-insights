@@ -1,5 +1,10 @@
 # Changelog
 
+## 8.5.4 - 2026-09-09
+
+- Fixed Seed Finder reloading to the home screen without activating the prepared save. LI now uses the current `.home__resume` control (“המשך מאיפה שהפסקת”), verifies that the pending save still owns the selected seed, and then resumes it automatically.
+- Seed application now writes the current explicit player-save shape, including `career: "player"`, while preserving sport-valid positions and keeping the bounded reload retry fail-closed.
+
 ## 8.5.3 - 2026-09-09
 
 - Fixed player careers being displayed as coach careers. The game writes `manager: true` into both player and coach saves; LI now trusts the explicit `career` field and uses only a narrow manager-setup choice fallback for older coach saves.

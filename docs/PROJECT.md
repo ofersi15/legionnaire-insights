@@ -3,7 +3,7 @@
 ## Current state
 
 - Userscript: `legionnaire-insights.user.js`
-- Current release: `8.5.3`; active runtime: `8.5.3`
+- Current release: `8.5.4`; active runtime: `8.5.4`
 - Target: `https://www.legionnaire.xyz/*`
 - Chrome desktop and Firefox Android use Tampermonkey.
 - Delivery: GitHub raw URL in `@updateURL` and `@downloadURL`.
@@ -14,11 +14,11 @@ The React SPA has no account/backend. Saves are event-sourced in `localStorage`;
 ## Features
 
 - Player POT comes from the seed. Coach careers use the explicit `career` field (with a narrow legacy choice fallback), never the shared `manager` flag; coach details omit player-only fields and tools.
-- Active-save lookup checks the sport-specific v2 save first, then the legacy `maslul-kariera:save:v1` fallback used by real football sessions, then the other sport save as a final compatibility fallback.
+- Active-save lookup checks sport v2, legacy football `maslul-kariera:save:v1`, then the other sport for compatibility.
 - Career-screen detection prefers a visible OVR tile and falls back to rendered career text on Firefox/React layouts where the OVR caption is not cleanly discoverable in the DOM. A save alone is never enough to show POT.
 - Outside a career screen the HUD shows only `LI`; stale save data must never expose a fake POT.
 - Mobile default HUD position is near the lower-left of the player header (`left: 20px`, `top: 62px`); dragging persists a custom position.
-- Tapping the HUD opens one mobile-first bottom sheet. The legacy 7.2 overlay/panel is no longer loaded.
+- Tapping the HUD opens one mobile-first bottom sheet; the legacy 7.2 panel is not loaded.
 - Bottom-sheet sections are mode-aware: player Details/Seed Finder/Agents, coach Details, shared deterministic Preview and Sync/Settings.
 - An opt-in seed preview marks predetermined probabilistic outcomes. Player decisions use `seed-step-apply-optionId`; coach decisions use `seed-step-mgr-apply-optionId`. Cards are matched by sport, title, option, outcome/effect signature and probability. Source-indexed coach-event and exact salary/summer/formation fallbacks cover Firefox cards without the normal React bridge; scout cards and compact split-pill outcomes use the same bounded card-local React path.
 - Live coach-match calls are annotated from the active bundle with their fixed meter effects: best `+14`, reasonable `+5`, risky `-7`.
@@ -26,7 +26,7 @@ The React SPA has no account/backend. Saves are event-sourced in `localStorage`;
 - Club data is cached after the first bundle parse and separated by sport, including identical IDs. Full names take precedence over short aliases; agent preferred-club IDs resolve from the active sport's map.
 - Club annotation is incremental and normally uses sparse post-interaction retries over 2.4 seconds. Firefox Android can render transfer cards after that window, so the wrapper arms one bounded late refresh after the user becomes idle and one final recovery only if no LI club badge appeared.
 - End-of-cycle screens can contain exactly one club offer beside Retirement. Because the runtime only compares 2+ offers, the wrapper has a narrow cached-club fallback that annotates exactly one club with `OVR NN` without applying a “strongest” outline.
-- Seed search uses a Web Worker; applying a seed writes the active sport's save (`PG` for basketball, `ST` for football), repairs invalid basketball positions, then reloads.
+- Seed search uses a Web Worker; applying a seed writes an explicit player save for the active sport (`PG` for basketball, `ST` for football), reloads, verifies the selected seed and activates the game's current resume button.
 - LI can be hidden completely; a low-opacity `LI` launcher remains at the saved HUD position for restoration.
 - Manual Export/Import remains available as a fallback.
 - Update awareness checks at startup (hourly limit) and on request. The wrapper resolves `main` through GitHub's API, reads a commit-pinned userscript, and hands that URL to Tampermonkey. The metadata-compatible `raw/main` URL remains a fallback.
@@ -35,7 +35,7 @@ The React SPA has no account/backend. Saves are event-sourced in `localStorage`;
 
 `legionnaire-insights.user.js` `@require`s exactly one runtime:
 
-- `runtime/legionnaire-insights-8.5.3.js`
+- `runtime/legionnaire-insights-8.5.4.js`
 
 The active install does **not** load `legionnaire-insights-core-7.2.0.js`, any `perf-gate-*`, any `native-ui-7.x`, or `diagnostics-7.10.0.js`. Those files remain in repository history only.
 

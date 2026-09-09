@@ -56,7 +56,7 @@ storage.clear();
 storage.setItem(LEGACY, JSON.stringify({ choices: [] }));
 assert.equal(activeSaveRecord('football'), null, 'a stale object without a seed is not an active save');
 
-const runtimePath = path.join(__dirname, '..', 'runtime', 'legionnaire-insights-8.5.3.js');
+const runtimePath = path.join(__dirname, '..', 'runtime', 'legionnaire-insights-8.5.4.js');
 const runtime = fs.readFileSync(runtimePath, 'utf8');
 const wrapper = fs.readFileSync(path.join(__dirname, '..', 'legionnaire-insights.user.js'), 'utf8');
 const careerModeContext = {};
@@ -69,6 +69,24 @@ vm.runInNewContext(`${extractFunction(runtime, 'careerMode')}
   ];`, careerModeContext);
 assert.deepEqual(Array.from(careerModeContext.results), ['player', 'coach', 'player', 'coach'],
   'career mode must trust the explicit career field, ignore the shared manager flag, and narrowly recognize legacy coach saves');
+assert.match(runtime, /career: 'player'/, 'Seed Finder must write an explicit player career save');
+assert.match(runtime, /JSON\.stringify\(\{ seed: String\(seed\) \}\)/, 'Seed Finder must persist the selected seed across reload');
+assert.match(runtime, /querySelector\('button\.home__resume'\)/, 'Seed Finder must resume through the current game home button');
+assert.match(runtime, /String\(pendingSave\.seed\) !== expectedSeed/, 'auto-resume must fail closed if the prepared seed changed');
+const pendingSeedStorage = new StorageMock();
+pendingSeedStorage.setItem(FOOTBALL, JSON.stringify({ seed: 'chosen-seed', choices: [], career: 'player' }));
+pendingSeedStorage.setItem('legionnaire-insights:autoContinue', JSON.stringify({ seed: 'chosen-seed' }));
+const resumeButton = { clicks: 0, textContent: 'המשך מאיפה שהפסקת', click() { this.clicks++; } };
+vm.runInNewContext(`${extractFunction(runtime, 'maybeAutoContinue')} maybeAutoContinue();`, {
+  AUTO_CONTINUE_KEY: 'legionnaire-insights:autoContinue', localStorage: pendingSeedStorage,
+  preferredSaveKey: () => FOOTBALL, readJson: (key, fallback) => {
+    const raw = pendingSeedStorage.getItem(key); return raw == null ? fallback : JSON.parse(raw);
+  },
+  document: { querySelector: () => resumeButton, querySelectorAll: () => [] }, visible: () => true,
+  norm: (value) => String(value || '').trim(), setTimeout: (fn) => { fn(); return 1; },
+});
+assert.equal(resumeButton.clicks, 1, 'Seed Finder must activate the prepared career after reload');
+assert.equal(pendingSeedStorage.getItem('legionnaire-insights:autoContinue'), null, 'successful resume must consume its pending marker');
 const breakpointMatch = runtime.match(/const DESKTOP_MIN_WIDTH = (\d+);/);
 assert.ok(breakpointMatch, 'desktop breakpoint must be explicit and testable');
 const desktopMinWidth = Number(breakpointMatch[1]);
