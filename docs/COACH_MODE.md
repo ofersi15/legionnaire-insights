@@ -15,7 +15,7 @@ Evidence came from the live game bundle `index-C6NZkW9Y.js`, isolated browser pl
 - Football and basketball club data overlap in names and IDs, so lookups and caches must remain sport-qualified.
 - Sync must preserve player/coach and divergent choice branches. An active save may advance only for the same seed/mode and an exact local-choice prefix.
 
-## Shipped in 8.4–8.5
+## Shipped in 8.4–8.5.2
 
 - Coach-aware HUD, details and navigation; player-only information suppressed.
 - Coach RNG namespace for standard deterministic previews, with narrow salary/summer fallbacks.
@@ -23,16 +23,18 @@ Evidence came from the live game bundle `index-C6NZkW9Y.js`, isolated browser pl
 - Branch-safe active-save and completed-history merging.
 - Standard coach-event forecasts now tolerate the game's compact labels and split gain/cost pills while still verifying the visible option, outcome identity and probability. The manager-routine fallback covers the verified football/basketball `fans`, `agent` and `rest` choices.
 - Firefox Android event cards now have a bundle-indexed fallback keyed by sport, title, option, outcome/effect signature and probability. Verified routine labels are available before the bundle fetch, and mobile forecast markers overlay compact pills so they are not clipped.
+- 8.5.2 replays the real manager season cursor instead of treating setup choices as seasons. It covers direct starts, source-indexed and basketball-only events, scouting/sales, salary/routine choices and formation switches; rendered choices below the viewport are decorated too.
+- The card-local React route now begins at every decision button, including scout cards, and targets probability bands rather than assuming one visual pill per outcome.
 
-The 8.5 verification reused the unchanged live asset `https://www.legionnaire.xyz/assets/index-C6NZkW9Y.js` (recorded SHA-256 `AEBD7D0C8429CD5D2241CD8E805289BEC8DA851C98C2BC014BBC0E907AD8A136`). Fixtures cover the supplied routine, standard event, transfer/scouting and spending-card examples without storing a save or invoking a choice.
+The 8.5.2 verification reused the unchanged live asset `https://www.legionnaire.xyz/assets/index-C6NZkW9Y.js` (recorded SHA-256 `AEBD7D0C8429CD5D2241CD8E805289BEC8DA851C98C2BC014BBC0E907AD8A136`). Two direct coach careers in each sport were played in the isolated sandbox (both football careers and one basketball career reached age 70; the other basketball career ended through its normal game path). Forecast coverage was checked on every encountered probabilistic button, and selected forecasts were compared with the roulette's landed outcome index. The run exposed and then closed gaps in first-season cursor inference, below-fold options, scout cards, sale follow-ups, formation switches and basketball-only event classification.
 
 ## Open questions, in priority order
 
-1. Build a compact decision inventory for both sports: decision ID, step derivation, option IDs, probabilities, effects, and whether the card exposes standard React props. Include direct-coach and retired-player-to-coach branches.
-2. Verify deterministic previews by replaying fixed seeds across refresh for the remaining coach card types. Fail closed when decision ownership, labels or step cannot be proven.
+1. Extend the compact decision inventory to the retired-player-to-coach branch and any rare national-team/final cards not reached by the four direct-coach runs.
+2. Recheck deterministic previews when the game bundle URL/hash changes. Fail closed when decision ownership, labels or step cannot be proven.
 3. Map transfer-window information: which player/club attributes are visible, which are predetermined, and whether any LI annotation would expose irrelevant player POT.
 4. Calculate exact expected values for budget/summer, salary and sponsorship choices from source effects; distinguish deterministic effects from seeded probability.
-5. Deep-test basketball parity, including basketball-only decisions, positions, club tables and mobile layouts.
+5. Recheck basketball parity on future bundle changes, especially new unsuffixed basketball-only event IDs.
 6. Test cross-device Sync with same seed but different mode/branch and with direct vs post-retirement coach histories.
 7. Run desktop and Android regression passes for overflow, badge collisions, missing OVR and stale player UI.
 

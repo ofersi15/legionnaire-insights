@@ -56,7 +56,7 @@ storage.clear();
 storage.setItem(LEGACY, JSON.stringify({ choices: [] }));
 assert.equal(activeSaveRecord('football'), null, 'a stale object without a seed is not an active save');
 
-const runtimePath = path.join(__dirname, '..', 'runtime', 'legionnaire-insights-8.5.1.js');
+const runtimePath = path.join(__dirname, '..', 'runtime', 'legionnaire-insights-8.5.2.js');
 const runtime = fs.readFileSync(runtimePath, 'utf8');
 const wrapper = fs.readFileSync(path.join(__dirname, '..', 'legionnaire-insights.user.js'), 'utf8');
 const breakpointMatch = runtime.match(/const DESKTOP_MIN_WIDTH = (\d+);/);
@@ -79,6 +79,9 @@ assert.match(runtime, /mgr-apply/, 'coach previews must use the manager RNG name
 assert.match(runtime, /mgr-stay-ask-wage-\$\{step\}/, 'manager salary negotiation must have an exact DOM fallback ID');
 assert.match(runtime, /mgr-train-\$\{slug\}-\$\{step\}/, 'manager summer decisions must have an exact DOM fallback ID');
 assert.match(runtime, /managerEventOptionsByLabel/, 'manager event cards must have a source-indexed DOM fallback');
+assert.match(runtime, /let indexedSport = 'football'/, 'manager event indexing must track the active source sport');
+assert.match(runtime, /if \(\/_BB\$\/\.test\(eventKey\)\) indexedSport = 'basketball'/,
+  'basketball-only event IDs after the first _BB card must stay in the basketball inventory');
 assert.match(runtime, /overflow:visible!important/, 'mobile prediction pills must not clip the forecast marker');
 assert.match(runtime, /position:absolute!important/, 'mobile forecast markers must overlay instead of changing card layout');
 assert.match(runtime, /המהלך הטוב · \+14/, 'live match previews must expose the exact best-call meter delta');
@@ -87,17 +90,39 @@ assert.match(runtime, /if \(!rendered\(card\) \|\| card\.closest/, 'club OVR pas
 
 const managerStepContext = {};
 vm.runInNewContext(`
+  const managerEventOptionIds = new Set(['LINEUP_LEAK_DEAL-take-deal']);
   ${extractFunction(runtime, 'inferredManagerStep')}
-  globalThis.result = inferredManagerStep({ choices: [
+  globalThis.results = [
+    inferredManagerStep({ choices: [
+      'mgr-philosophy-attacking', 'mgr-formation-4-2-2-2', 'mgr-job-il-2210'
+    ] }),
+    inferredManagerStep({ choices: [
     'mgr-formation-3-4-1-2', 'mgr-job-il-5245', 'mgr-scout-fb-43-1',
     'mgr-stay-2', 'mgr-shop-medical-3'
-  ] });
+    ] }),
+    inferredManagerStep({ choices: [
+      'mgr-philosophy-attacking', 'mgr-formation-4-3-3', 'mgr-job-il-2210',
+      'mgr-train-captain-1', 'LINEUP_LEAK_DEAL-take-deal'
+    ] }),
+    inferredManagerStep({ choices: [
+      'mgr-accept-18', 'mgr-philosophy-balanced', 'mgr-formation-4-4-2',
+      'mgr-job-il-2210'
+    ] }),
+    inferredManagerStep({ choices: [
+      'mgr-philosophy-attacking', 'mgr-formation-4-3-3', 'mgr-job-il-2210',
+      'mgr-scout-fb-1-1', 'mgr-sell-no-2'
+    ] }),
+  ];
 `, managerStepContext);
-assert.equal(managerStepContext.result, 4, 'manager replay cursor must advance from the latest season-ending shop choice');
+assert.deepEqual(Array.from(managerStepContext.results), [1, 4, 3, 19, 3],
+  'manager replay cursor must cover direct starts, step-bearing choices, source-indexed events and post-player careers');
+assert.match(runtime, /\.option__name,\.scout__name/, 'React lookup must match transfer-window scout cards by their rendered player name');
+assert.match(runtime, /if \(!rendered\(card\) \|\| card\.closest/, 'manager DOM forecasts must include rendered choices below the viewport fold');
 
 assert.match(runtime, /toolbarAnchor\.insertBefore\(hud, trophyCase \|\| null\)/, 'toolbar is inserted inside the player card before the trophy case');
 assert.doesNotMatch(runtime, /setInterval/, 'deployed runtime must not poll');
-assert.match(runtime, /document\.querySelectorAll\('\.decision \.option'\)/, 'prediction lookup must start from visible decision cards');
+assert.match(runtime, /document\.querySelectorAll\('\.decision button'\)/, 'prediction lookup must start from every decision button, including scout cards');
+assert.match(runtime, /const pill = bands\[prediction\.index\]\.band/, 'React forecasts must target one probability band even when compact outcomes use extra pills');
 assert.match(runtime, /depth < 8/, 'React lookup must have a small hard traversal bound');
 assert.match(runtime, /fiber\?\.alternate \? \[fiber, fiber\.alternate\] : \[fiber\]/, 'prediction lookup must inspect the host React alternate');
 assert.match(runtime, /__reactProps\$/, 'prediction lookup must identify the currently committed host props');
@@ -319,7 +344,7 @@ const currentOdds = currentBands.map((band, index) => ({
 const fakeCard = {
   wrappedJSObject: null,
   querySelector(selector) {
-    return selector === '.option__name' ? { textContent: currentOption.label } : null;
+    return selector === '.option__name,.scout__name' ? { textContent: currentOption.label } : null;
   },
   querySelectorAll(selector) {
     return selector === '.pill__odds,.num' ? currentOdds : [];
@@ -369,6 +394,19 @@ vm.runInNewContext(`
 `, managerDomContext);
 assert.equal(managerDomContext.optionId, 'mgr-train-fans-6', 'manager routine cards must resolve their exact seeded option ID from the visible label');
 
+const formationDomContext = {};
+vm.runInNewContext(`
+  const norm = (value) => String(value || '').replace(/\\s+/g, ' ').trim();
+  const managerTrainingSlugByLabel = new Map();
+  ${extractFunction(runtime, 'managerOptionIdFromCard')}
+  globalThis.results = [
+    managerOptionIdFromCard({ textContent: 'להישאר נאמן לריצות מעבר 85% כושר +6 15% אמון -6', querySelector() { return null; }, matches(s) { return s === '.fswitch-row--stay'; } }, 8),
+    managerOptionIdFromCard({ textContent: 'לעבור למשחק תנועה 55% ביצועים +2 45% אמון -6', querySelector() { return null; }, matches(s) { return s === '.fswitch-row'; } }, 9),
+  ];
+`, formationDomContext);
+assert.deepEqual(Array.from(formationDomContext.results), ['mgr-switch-stay-8', 'mgr-switch-motion-9'],
+  'formation-switch cards must resolve exact football and basketball manager option IDs');
+
 const eventInventoryContext = {};
 const eventInventoryStart = runtime.indexOf('function parsedBundleString(');
 const eventInventoryEnd = runtime.indexOf('function indexLiveCalls(', eventInventoryStart);
@@ -376,6 +414,7 @@ assert.ok(eventInventoryStart > 0 && eventInventoryEnd > eventInventoryStart, 'm
 vm.runInNewContext(`
   const norm = (value) => String(value || '').replace(/\\s+/g, ' ').trim();
   const managerEventOptionsByLabel = new Map();
+  const managerEventOptionIds = new Set();
   ${runtime.slice(eventInventoryStart, eventInventoryEnd)}
   const fixture = '{key:"LINEUP_LEAK_DEAL",title:"העסקה עם העיתונאי",description:"fixture",weight:5,options:[{key:"take-deal",icon:"🤝",label:"סוגר עסקה",outcomes:[{probability:.5,resultLabel:"טוב · אמון +6",positive:true,effects:{board:6}},{probability:.5,resultLabel:"רע · מוניטין -6",positive:false,effects:{reputation:-6}}]}]},{key:"LINEUP_LEAK_DEAL_BB",title:"העסקה עם העיתונאי",description:"fixture",weight:5,options:[{key:"take-deal",icon:"📺",label:"סוגר עסקה",outcomes:[{probability:.6,resultLabel:"טוב · מוניטין +3",positive:true,effects:{reputation:3}},{probability:.4,resultLabel:"רע · מוניטין -6",positive:false,effects:{reputation:-6}}]}]}'
   indexManagerEventOptions(fixture);

@@ -1,5 +1,12 @@
 # Changelog
 
+## 8.5.2 - 2026-09-09
+
+- Fixed missing or shifted coach forecasts by replaying the real manager season cursor from saved choice IDs. Direct starts no longer count philosophy/formation setup as seasons; event, scouting, sale, shop, transfer and formation decisions now advance the cursor correctly.
+- Expanded card-local coverage to every decision button, including scout cards, compact split-pill outcomes, formation switches and choices rendered below the viewport. The bounded parent-only React lookup, no-polling behavior and read-only RNG calculation are unchanged.
+- Correctly classified basketball-only manager events whose IDs do not end in `_BB`, while preserving exact sport/title/option/probability matching and fail-closed ambiguity handling.
+- Completed two isolated direct-coach careers in football and two in basketball against the unchanged recorded bundle, comparing forecast indexes with landed roulette indexes across the encountered probabilistic decisions.
+
 ## 8.5.1 - 2026-09-09
 
 - Added a source-indexed, fail-closed fallback for coach event cards that Firefox Android does not expose through the normal React option bridge. It requires an exact sport, decision title, option label, outcome/effect signature and probability match before using the manager RNG namespace.

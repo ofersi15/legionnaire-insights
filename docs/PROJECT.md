@@ -3,13 +3,13 @@
 ## Current state
 
 - Userscript: `legionnaire-insights.user.js`
-- Current release: `8.5.1`; active runtime: `8.5.1`
+- Current release: `8.5.2`; active runtime: `8.5.2`
 - Target: `https://www.legionnaire.xyz/*`
-- Desktop: Chrome; mobile: Firefox Android; both use Tampermonkey.
-- Code delivery: public GitHub raw URL in `@updateURL` and `@downloadURL`.
+- Chrome desktop and Firefox Android use Tampermonkey.
+- Delivery: GitHub raw URL in `@updateURL` and `@downloadURL`.
 - Save transport: secret Gist `e1226286d7087eb8faacbf820b8b666f`, owner `ofersi15`.
 
-The game is a React SPA with no account/backend. Saves are event-sourced in origin `localStorage`; a career is recreated from its seed and ordered choice IDs.
+The React SPA has no account/backend. Saves are event-sourced in `localStorage`; a career is recreated from its seed and ordered choice IDs.
 
 ## Features
 
@@ -20,7 +20,7 @@ The game is a React SPA with no account/backend. Saves are event-sourced in orig
 - Mobile default HUD position is near the lower-left of the player header (`left: 20px`, `top: 62px`); dragging persists a custom position.
 - Tapping the HUD opens one mobile-first bottom sheet. The legacy 7.2 overlay/panel is no longer loaded.
 - Bottom-sheet sections are mode-aware: player Details/Seed Finder/Agents, coach Details, shared deterministic Preview and Sync/Settings.
-- An opt-in seed preview marks predetermined probabilistic outcomes. Player decisions use `seed-step-apply-optionId`; coach decisions use `seed-step-mgr-apply-optionId`. Cards are matched by sport, title, option, outcome/effect signature and probability. Source-indexed coach-event and exact salary/summer fallbacks cover Firefox cards without the normal React bridge.
+- An opt-in seed preview marks predetermined probabilistic outcomes. Player decisions use `seed-step-apply-optionId`; coach decisions use `seed-step-mgr-apply-optionId`. Cards are matched by sport, title, option, outcome/effect signature and probability. Source-indexed coach-event and exact salary/summer/formation fallbacks cover Firefox cards without the normal React bridge; scout cards and compact split-pill outcomes use the same bounded card-local React path.
 - Live coach-match calls are annotated from the active bundle with their fixed meter effects: best `+14`, reasonable `+5`, risky `-7`.
 - Club-choice cards show only `OVR NN`, with the strongest visible offer outlined. Coach badges sit in normal card flow and every rendered offer is covered, including cards initially below the viewport.
 - Club data is cached after the first bundle parse and separated by sport, including identical IDs. Full names take precedence over short aliases; agent preferred-club IDs resolve from the active sport's map.
@@ -29,13 +29,13 @@ The game is a React SPA with no account/backend. Saves are event-sourced in orig
 - Seed search uses a Web Worker; applying a seed writes the active sport's save (`PG` for basketball, `ST` for football), repairs invalid basketball positions, then reloads.
 - LI can be hidden completely; a low-opacity `LI` launcher remains at the saved HUD position for restoration.
 - Manual Export/Import remains available as a fallback.
-- Update awareness checks at startup (rate-limited to one hour) and on explicit request. The wrapper resolves `main` through GitHub's commits API, reads an immutable commit-pinned userscript, and hands that pinned URL to Tampermonkey. The metadata-compatible `raw/main` URL remains a fallback.
+- Update awareness checks at startup (hourly limit) and on request. The wrapper resolves `main` through GitHub's API, reads a commit-pinned userscript, and hands that URL to Tampermonkey. The metadata-compatible `raw/main` URL remains a fallback.
 
 ## Runtime architecture
 
 `legionnaire-insights.user.js` `@require`s exactly one runtime:
 
-- `runtime/legionnaire-insights-8.5.1.js`
+- `runtime/legionnaire-insights-8.5.2.js`
 
 The active install does **not** load `legionnaire-insights-core-7.2.0.js`, any `perf-gate-*`, any `native-ui-7.x`, or `diagnostics-7.10.0.js`. Those files remain in repository history only.
 
@@ -49,7 +49,7 @@ V8 is intentionally event-driven:
 
 HUD/toolbar and club UI refresh after real user interaction, visibility changes, a coalesced resize frame, a short startup burst and the bounded late club recovery described above. There is no continuous gameplay watcher. At 900px+ with a fine pointer, the toolbar is inserted immediately before the player card's trophy case; narrower or coarse-pointer layouts retain the draggable floating HUD.
 
-Seed preview starts at visible probabilistic cards, selects the committed host fiber from current DOM props and walks at most eight `return` levels. A current save seed must own the live decision ID and all visible outcomes must match. It never walks child/sibling fibers or the React root. Step comes from the decision ID; narrow custom coach fallbacks infer the next season step only from recognized manager choice IDs. LI reproduces the roll without mutation.
+Seed preview starts at visible probabilistic decision buttons, selects the committed host fiber from current DOM props and walks at most eight `return` levels. A current save seed must own the live decision ID and all visible outcomes must match. It never walks child/sibling fibers or the React root. Step comes from the decision ID; narrow custom coach fallbacks replay recognized manager season choices (including direct starts, events, scouting/sales and formation changes). LI reproduces the roll without mutation.
 
 The deployable wrapper contains only small compatibility bridges around the single runtime: cache-safe Tampermonkey update handoff plus bounded recovery for late/single-club cards. Feature/state/sync logic remains in the runtime. Current coach evidence and open work live in `docs/COACH_MODE.md`; the low-context workflow is in `docs/TOKEN_EFFICIENT_WORKFLOW.md`.
 
