@@ -56,7 +56,7 @@ storage.clear();
 storage.setItem(LEGACY, JSON.stringify({ choices: [] }));
 assert.equal(activeSaveRecord('football'), null, 'a stale object without a seed is not an active save');
 
-const runtimePath = path.join(__dirname, '..', 'runtime', 'legionnaire-insights-8.5.0.js');
+const runtimePath = path.join(__dirname, '..', 'runtime', 'legionnaire-insights-8.5.1.js');
 const runtime = fs.readFileSync(runtimePath, 'utf8');
 const wrapper = fs.readFileSync(path.join(__dirname, '..', 'legionnaire-insights.user.js'), 'utf8');
 const breakpointMatch = runtime.match(/const DESKTOP_MIN_WIDTH = (\d+);/);
@@ -78,6 +78,9 @@ assert.match(runtime, /match\(\/\\d\{2,3\}\//, 'compact OVR text without a word 
 assert.match(runtime, /mgr-apply/, 'coach previews must use the manager RNG namespace');
 assert.match(runtime, /mgr-stay-ask-wage-\$\{step\}/, 'manager salary negotiation must have an exact DOM fallback ID');
 assert.match(runtime, /mgr-train-\$\{slug\}-\$\{step\}/, 'manager summer decisions must have an exact DOM fallback ID');
+assert.match(runtime, /managerEventOptionsByLabel/, 'manager event cards must have a source-indexed DOM fallback');
+assert.match(runtime, /overflow:visible!important/, 'mobile prediction pills must not clip the forecast marker');
+assert.match(runtime, /position:absolute!important/, 'mobile forecast markers must overlay instead of changing card layout');
 assert.match(runtime, /המהלך הטוב · \+14/, 'live match previews must expose the exact best-call meter delta');
 assert.match(runtime, /ללא POT של שחקן/, 'coach details must explicitly omit irrelevant player POT');
 assert.match(runtime, /if \(!rendered\(card\) \|\| card\.closest/, 'club OVR pass must include rendered cards below the viewport fold');
@@ -365,6 +368,27 @@ vm.runInNewContext(`
   }, 6);
 `, managerDomContext);
 assert.equal(managerDomContext.optionId, 'mgr-train-fans-6', 'manager routine cards must resolve their exact seeded option ID from the visible label');
+
+const eventInventoryContext = {};
+const eventInventoryStart = runtime.indexOf('function parsedBundleString(');
+const eventInventoryEnd = runtime.indexOf('function indexLiveCalls(', eventInventoryStart);
+assert.ok(eventInventoryStart > 0 && eventInventoryEnd > eventInventoryStart, 'manager event inventory helpers must be locatable');
+vm.runInNewContext(`
+  const norm = (value) => String(value || '').replace(/\\s+/g, ' ').trim();
+  const managerEventOptionsByLabel = new Map();
+  ${runtime.slice(eventInventoryStart, eventInventoryEnd)}
+  const fixture = '{key:"LINEUP_LEAK_DEAL",title:"העסקה עם העיתונאי",description:"fixture",weight:5,options:[{key:"take-deal",icon:"🤝",label:"סוגר עסקה",outcomes:[{probability:.5,resultLabel:"טוב · אמון +6",positive:true,effects:{board:6}},{probability:.5,resultLabel:"רע · מוניטין -6",positive:false,effects:{reputation:-6}}]}]},{key:"LINEUP_LEAK_DEAL_BB",title:"העסקה עם העיתונאי",description:"fixture",weight:5,options:[{key:"take-deal",icon:"📺",label:"סוגר עסקה",outcomes:[{probability:.6,resultLabel:"טוב · מוניטין +3",positive:true,effects:{reputation:3}},{probability:.4,resultLabel:"רע · מוניטין -6",positive:false,effects:{reputation:-6}}]}]}'
+  indexManagerEventOptions(fixture);
+  globalThis.results = managerEventOptionsByLabel.get('סוגר עסקה');
+`, eventInventoryContext);
+assert.deepEqual(Array.from(eventInventoryContext.results, (candidate) => ({
+  id: candidate.id,
+  sport: candidate.sport,
+  probabilities: Array.from(candidate.outcomes, (outcome) => outcome.probability),
+})), [
+  { id: 'LINEUP_LEAK_DEAL-take-deal', sport: 'football', probabilities: [0.5, 0.5] },
+  { id: 'LINEUP_LEAK_DEAL_BB-take-deal', sport: 'basketball', probabilities: [0.6, 0.4] },
+], 'event inventory must retain exact option IDs, sports and probabilities');
 
 function seedHash(text) {
   let state = 2166136261 >>> 0;

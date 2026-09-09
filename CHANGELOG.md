@@ -1,5 +1,11 @@
 # Changelog
 
+## 8.5.1 - 2026-09-09
+
+- Added a source-indexed, fail-closed fallback for coach event cards that Firefox Android does not expose through the normal React option bridge. It requires an exact sport, decision title, option label, outcome/effect signature and probability match before using the manager RNG namespace.
+- Made the verified manager summer/routine option IDs available immediately instead of waiting for the game bundle fetch, covering spending rows such as “דלת פתוחה לתקשורת”.
+- Fixed the compact mobile 🔮 marker being clipped inside transfer and scouting outcome pills; the marker now overlays the selected pill without changing the game's card layout.
+
 ## 8.5.0 - 2026-09-08
 
 - Fixed missing deterministic coach forecasts on standard event cards whose rendered outcome text uses compact labels or split gain/cost pills. Matching now verifies the visible option, outcome label/effect signature and probability before marking the seeded result.

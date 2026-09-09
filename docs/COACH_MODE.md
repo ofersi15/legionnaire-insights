@@ -22,8 +22,9 @@ Evidence came from the live game bundle `index-C6NZkW9Y.js`, isolated browser pl
 - Read-only touchline guidance and coach club OVR layout/coverage fixes.
 - Branch-safe active-save and completed-history merging.
 - Standard coach-event forecasts now tolerate the game's compact labels and split gain/cost pills while still verifying the visible option, outcome identity and probability. The manager-routine fallback covers the verified football/basketball `fans`, `agent` and `rest` choices.
+- Firefox Android event cards now have a bundle-indexed fallback keyed by sport, title, option, outcome/effect signature and probability. Verified routine labels are available before the bundle fetch, and mobile forecast markers overlay compact pills so they are not clipped.
 
-The 8.5 verification reused the unchanged live asset `https://www.legionnaire.xyz/assets/index-C6NZkW9Y.js` (recorded SHA-256 `AEBD7D0C8429CD5D2241CD8E805289BEC8DA851C98C2BC014BBC0E907AD8A136`). Fixtures covered the supplied “שגרת מאמן” and “כוכב עם עבר בעייתי” cards without storing a save or invoking a choice.
+The 8.5 verification reused the unchanged live asset `https://www.legionnaire.xyz/assets/index-C6NZkW9Y.js` (recorded SHA-256 `AEBD7D0C8429CD5D2241CD8E805289BEC8DA851C98C2BC014BBC0E907AD8A136`). Fixtures cover the supplied routine, standard event, transfer/scouting and spending-card examples without storing a save or invoking a choice.
 
 ## Open questions, in priority order
 
