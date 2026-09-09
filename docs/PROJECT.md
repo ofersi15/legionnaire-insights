@@ -3,7 +3,7 @@
 ## Current state
 
 - Userscript: `legionnaire-insights.user.js`
-- Current release: `8.4.0`
+- Current release: `8.4.1` (wrapper); active runtime: `8.4.0`
 - Target: `https://www.legionnaire.xyz/*`
 - Desktop: Chrome; mobile: Firefox Android; both use Tampermonkey.
 - Code delivery: public GitHub raw URL in `@updateURL` and `@downloadURL`.
@@ -29,7 +29,7 @@ The game is a React SPA with no account/backend. Saves are event-sourced in orig
 - Seed search uses a Web Worker; applying a seed writes the active sport's save (`PG` for basketball, `ST` for football), repairs invalid basketball positions, then reloads.
 - LI can be hidden completely; a low-opacity `LI` launcher remains at the saved HUD position for restoration.
 - Manual Export/Import remains available as a fallback.
-- Update awareness checks at startup (rate-limited to one hour) and on explicit request. When a newer version is detected, the in-app control changes to `עדכן ל-X` and hands the raw `.user.js` URL to Tampermonkey for its normal update/install confirmation screen.
+- Update awareness checks at startup (rate-limited to one hour) and on explicit request. The wrapper resolves `main` through GitHub's commits API, reads an immutable commit-pinned userscript, and hands that pinned URL to Tampermonkey. The metadata-compatible `raw/main` URL remains a fallback.
 
 ## Runtime architecture
 
@@ -51,7 +51,7 @@ HUD/toolbar and club UI refresh after real user interaction, visibility changes,
 
 Seed preview starts at visible probabilistic cards, selects the committed host fiber from current DOM props and walks at most eight `return` levels. A current save seed must own the live decision ID and all visible outcomes must match. It never walks child/sibling fibers or the React root. Step comes from the decision ID; narrow custom coach fallbacks infer the next season step only from recognized manager choice IDs. LI reproduces the roll without mutation.
 
-The deployable wrapper contains only small compatibility bridges around the single runtime: Tampermonkey update handoff plus bounded recovery for late/single-club cards. Feature/state/sync logic remains in the runtime.
+The deployable wrapper contains only small compatibility bridges around the single runtime: cache-safe Tampermonkey update handoff plus bounded recovery for late/single-club cards. Feature/state/sync logic remains in the runtime. Current coach evidence and open work live in `docs/COACH_MODE.md`; the low-context workflow is in `docs/TOKEN_EFFICIENT_WORKFLOW.md`.
 
 ## Important game keys
 

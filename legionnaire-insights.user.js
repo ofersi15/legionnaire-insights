@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         Legionnaire Insights
 // @namespace    legionnaire-insights
-// @version      8.4.0
+// @version      8.4.1
 // @description  Player and coach insights, deterministic previews, club strength and branch-safe sparse cloud sync.
 // @match        https://www.legionnaire.xyz/*
 // @grant        GM_xmlhttpRequest
@@ -29,10 +29,12 @@
   'use strict';
 
   const UPDATE_URL = 'https://raw.githubusercontent.com/ofersi15/legionnaire-insights/main/legionnaire-insights.user.js';
+  const LATEST_COMMIT_URL = 'https://api.github.com/repos/ofersi15/legionnaire-insights/commits/main';
   const CLUB_BADGE_SELECTOR = '[data-li-v8-club-badge]';
   const CLUB_CARD_SELECTOR = '[data-li-v8-club-card]';
   const CLUB_CACHE_KEY = 'legionnaire-insights:club-cache-v4';
   let latestPromise = null;
+  let latestInstallUrl = UPDATE_URL;
   let lateClubTimer = 0;
   let finalClubTimer = 0;
 
@@ -49,23 +51,53 @@
     return 0;
   }
 
-  function fetchLatest(force = false) {
-    if (!force && latestPromise) return latestPromise;
-    latestPromise = new Promise((resolve) => {
+  function requestText(url) {
+    return new Promise((resolve) => {
       GM_xmlhttpRequest({
         method: 'GET',
-        url: `${UPDATE_URL}?li_check=${Date.now()}`,
+        url,
+        headers: { Accept: 'application/vnd.github+json' },
         timeout: 15000,
-        onload: (res) => {
-          const match = res.status >= 200 && res.status < 300
-            ? res.responseText.match(/^\/\/ @version\s+([^\s]+)$/m)
-            : null;
-          resolve(match ? match[1] : '');
-        },
+        onload: (res) => resolve(res.status >= 200 && res.status < 300 ? res.responseText : ''),
         onerror: () => resolve(''),
         ontimeout: () => resolve(''),
       });
     });
+  }
+
+  function versionFromSource(source) {
+    const match = String(source || '').match(/^\/\/ @version\s+([^\s]+)$/m);
+    return match ? match[1] : '';
+  }
+
+  function pinnedUpdateUrl(sha) {
+    return `https://raw.githubusercontent.com/ofersi15/legionnaire-insights/${sha}/legionnaire-insights.user.js`;
+  }
+
+  async function resolveLatest() {
+    // raw/main can remain stale behind GitHub's CDN even after main advances.
+    // Resolve main through the API, then inspect and install the immutable commit.
+    const commitText = await requestText(`${LATEST_COMMIT_URL}?li_check=${Date.now()}`);
+    try {
+      const sha = JSON.parse(commitText).sha;
+      if (/^[0-9a-f]{40}$/i.test(sha)) {
+        const pinnedUrl = pinnedUpdateUrl(sha);
+        const version = versionFromSource(await requestText(`${pinnedUrl}?li_check=${Date.now()}`));
+        if (version) {
+          latestInstallUrl = pinnedUrl;
+          return version;
+        }
+      }
+    } catch (e) {
+      // Fall through to the metadata-compatible branch URL.
+    }
+    latestInstallUrl = UPDATE_URL;
+    return versionFromSource(await requestText(`${UPDATE_URL}?li_check=${Date.now()}`));
+  }
+
+  function fetchLatest(force = false) {
+    if (!force && latestPromise) return latestPromise;
+    latestPromise = resolveLatest();
     return latestPromise;
   }
 
@@ -92,7 +124,7 @@
   }
 
   function openInstaller(version) {
-    const url = `${UPDATE_URL}?li_install=${encodeURIComponent(version || Date.now())}`;
+    const url = `${latestInstallUrl}?li_install=${encodeURIComponent(version || Date.now())}`;
     const opened = window.open(url, '_blank');
     if (!opened) location.assign(url);
   }

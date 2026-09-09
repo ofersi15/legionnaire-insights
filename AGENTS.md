@@ -8,8 +8,20 @@ These instructions apply to the entire repository.
 2. Read `docs/PROJECT.md` for current architecture and invariants.
 3. Read only the relevant part of `legionnaire-insights.user.js`.
 4. Read `CHANGELOG.md` only when release history matters.
+5. For coach work, read `docs/COACH_MODE.md`; for handoff/session work, read `docs/TOKEN_EFFICIENT_WORKFLOW.md`.
 
 Do not reconstruct context from old chats or copy long historical narratives into source comments. Repository files are the source of truth.
+
+## Token-efficient operating protocol
+
+- Work on one bounded release/question per session. Persist verified findings before changing topic.
+- Search with `rg`, then read only the matching function/range. Never dump a whole runtime, minified bundle, suite or long changelog when a slice answers the question.
+- Identify live assets by URL/hash. Reuse unchanged captures; otherwise extract only relevant symbols, keys, RNG labels and effects.
+- Browser-play only unresolved behavior. Resume isolated saves, test the smallest representative path and record only new evidence.
+- Batch independent reads. Run narrow tests while editing and the full suite once before release; repeat only after failure or further code changes.
+- Keep commentary to decisions, evidence and blockers. Do not paste logs, generated blobs, full saves or repeated plans.
+- Do not create parallel agents by default; setup and duplicated context usually cost more than they save here.
+- End with current-state docs, changelog/version when shipped, and one next step. A fresh session must not need the previous chat.
 
 ## Release rules
 
@@ -24,8 +36,8 @@ Do not reconstruct context from old chats or copy long historical narratives int
 
 - Each device writes only its own `legionnaire-device-<id>.snapshot.json` Gist file.
 - Snapshot payloads are gzip/base64 with SHA-256 verification.
-- Counter/map ledgers merge by per-device maximum; histories union by seed.
-- For the same active-career seed, the longer choices list wins. Different seeds must never overwrite one another automatically.
+- Counter/map ledgers merge by per-device maximum; histories preserve distinct seed, mode and choice branches.
+- An active save advances only when seed/mode match and local choices are an exact prefix. Divergent branches and different seeds never overwrite local state automatically.
 - Preserve v6.15 chunk import until both real devices have successfully migrated to v7.
 - Tokens belong in `GM_*Value`, never page `localStorage`.
 

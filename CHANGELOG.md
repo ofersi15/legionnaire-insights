@@ -1,5 +1,10 @@
 # Changelog
 
+## 8.4.1 - 2026-09-08
+
+- Fixed the in-panel updater missing a published release when GitHub's `raw/main` CDN still served an older wrapper. The checker now resolves `main` through the GitHub commits API, verifies the version from that immutable commit and opens the same pinned file for Tampermonkey installation; `raw/main` remains a fallback.
+- Added a token-efficient repository workflow and a compact coach-mode evidence/backlog document so future sessions can start from verified current state without rereading long chats or repeatedly mining the full game bundle.
+
 ## 8.4.0 - 2026-09-08
 
 - Added first-class coach-career support for football and basketball. LI now identifies direct coach saves, keeps the coach HUD/desktop toolbar free of player-only POT and Agents/Seed Finder controls, and exposes a compact coach-details sheet instead.

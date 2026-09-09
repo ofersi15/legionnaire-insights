@@ -102,6 +102,10 @@ assert.match(runtime, /decisionStepFromId/, 'prediction step must come from the 
 assert.doesNotMatch(runtime, /fiber\.(child|sibling)/, 'prediction lookup must never traverse the React tree');
 assert.doesNotMatch(runtime, /querySelectorAll\(['"]\*['"]\)/, 'prediction lookup must never scan every DOM element');
 assert.match(wrapper, /^\/\/ @grant\s+unsafeWindow$/m, 'wrapper must expose the page bridge for Chrome and Firefox userscript sandboxes');
+assert.match(wrapper, /api\.github\.com\/repos\/ofersi15\/legionnaire-insights\/commits\/main/, 'updater must resolve main independently of the raw branch CDN');
+assert.match(wrapper, /\^\[0-9a-f\]\{40\}\$/i, 'updater must validate the commit SHA before constructing an install URL');
+assert.match(wrapper, /latestInstallUrl = pinnedUrl/, 'Tampermonkey handoff must use the same immutable source that supplied the version');
+assert.match(wrapper, /latestInstallUrl = UPDATE_URL/, 'raw main must remain a compatibility fallback');
 
 const seedPositionContext = {};
 vm.runInNewContext(`
