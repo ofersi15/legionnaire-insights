@@ -15,17 +15,20 @@ Evidence came from the live game bundle `index-C6NZkW9Y.js`, isolated browser pl
 - Football and basketball club data overlap in names and IDs, so lookups and caches must remain sport-qualified.
 - Sync must preserve player/coach and divergent choice branches. An active save may advance only for the same seed/mode and an exact local-choice prefix.
 
-## Shipped in 8.4
+## Shipped in 8.4–8.5
 
 - Coach-aware HUD, details and navigation; player-only information suppressed.
 - Coach RNG namespace for standard deterministic previews, with narrow salary/summer fallbacks.
 - Read-only touchline guidance and coach club OVR layout/coverage fixes.
 - Branch-safe active-save and completed-history merging.
+- Standard coach-event forecasts now tolerate the game's compact labels and split gain/cost pills while still verifying the visible option, outcome identity and probability. The manager-routine fallback covers the verified football/basketball `fans`, `agent` and `rest` choices.
+
+The 8.5 verification reused the unchanged live asset `https://www.legionnaire.xyz/assets/index-C6NZkW9Y.js` (recorded SHA-256 `AEBD7D0C8429CD5D2241CD8E805289BEC8DA851C98C2BC014BBC0E907AD8A136`). Fixtures covered the supplied “שגרת מאמן” and “כוכב עם עבר בעייתי” cards without storing a save or invoking a choice.
 
 ## Open questions, in priority order
 
 1. Build a compact decision inventory for both sports: decision ID, step derivation, option IDs, probabilities, effects, and whether the card exposes standard React props. Include direct-coach and retired-player-to-coach branches.
-2. Verify deterministic previews by replaying fixed seeds across refresh for every coach card type. Fail closed when decision ownership, labels or step cannot be proven.
+2. Verify deterministic previews by replaying fixed seeds across refresh for the remaining coach card types. Fail closed when decision ownership, labels or step cannot be proven.
 3. Map transfer-window information: which player/club attributes are visible, which are predetermined, and whether any LI annotation would expose irrelevant player POT.
 4. Calculate exact expected values for budget/summer, salary and sponsorship choices from source effects; distinguish deterministic effects from seeded probability.
 5. Deep-test basketball parity, including basketball-only decisions, positions, club tables and mobile layouts.

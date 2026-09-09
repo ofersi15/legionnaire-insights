@@ -1,5 +1,10 @@
 # Changelog
 
+## 8.5.0 - 2026-09-08
+
+- Fixed missing deterministic coach forecasts on standard event cards whose rendered outcome text uses compact labels or split gain/cost pills. Matching now verifies the visible option, outcome label/effect signature and probability before marking the seeded result.
+- Revalidated the custom manager-routine fallback for football and basketball, including the three supplied examples (`fans`, `agent`, `rest`), against the unchanged live `index-C6NZkW9Y.js` bundle. Predictions remain read-only and card-local.
+
 ## 8.4.1 - 2026-09-08
 
 - Fixed the in-panel updater missing a published release when GitHub's `raw/main` CDN still served an older wrapper. The checker now resolves `main` through the GitHub commits API, verifies the version from that immutable commit and opens the same pinned file for Tampermonkey installation; `raw/main` remains a fallback.

@@ -3,7 +3,7 @@
 ## Current state
 
 - Userscript: `legionnaire-insights.user.js`
-- Current release: `8.4.1` (wrapper); active runtime: `8.4.0`
+- Current release: `8.5.0`; active runtime: `8.5.0`
 - Target: `https://www.legionnaire.xyz/*`
 - Desktop: Chrome; mobile: Firefox Android; both use Tampermonkey.
 - Code delivery: public GitHub raw URL in `@updateURL` and `@downloadURL`.
@@ -20,7 +20,7 @@ The game is a React SPA with no account/backend. Saves are event-sourced in orig
 - Mobile default HUD position is near the lower-left of the player header (`left: 20px`, `top: 62px`); dragging persists a custom position.
 - Tapping the HUD opens one mobile-first bottom sheet. The legacy 7.2 overlay/panel is no longer loaded.
 - Bottom-sheet sections are mode-aware: player Details/Seed Finder/Agents, coach Details, shared deterministic Preview and Sync/Settings.
-- An opt-in seed preview marks predetermined probabilistic outcomes. Player decisions use `seed-step-apply-optionId`; coach decisions use `seed-step-mgr-apply-optionId`. Custom coach salary/summer cards use narrow, game-source-derived fallbacks.
+- An opt-in seed preview marks predetermined probabilistic outcomes. Player decisions use `seed-step-apply-optionId`; coach decisions use `seed-step-mgr-apply-optionId`. Visible cards are matched by option label, outcome label/effect signature and probability; custom coach salary/summer cards use narrow, game-source-derived fallbacks.
 - Live coach-match calls are annotated from the active bundle with their fixed meter effects: best `+14`, reasonable `+5`, risky `-7`.
 - Club-choice cards show only `OVR NN`, with the strongest visible offer outlined. Coach badges sit in normal card flow and every rendered offer is covered, including cards initially below the viewport.
 - Club data is cached after the first bundle parse and separated by sport, including identical IDs. Full names take precedence over short aliases; agent preferred-club IDs resolve from the active sport's map.
@@ -35,7 +35,7 @@ The game is a React SPA with no account/backend. Saves are event-sourced in orig
 
 `legionnaire-insights.user.js` `@require`s exactly one runtime:
 
-- `runtime/legionnaire-insights-8.4.0.js`
+- `runtime/legionnaire-insights-8.5.0.js`
 
 The active install does **not** load `legionnaire-insights-core-7.2.0.js`, any `perf-gate-*`, any `native-ui-7.x`, or `diagnostics-7.10.0.js`. Those files remain in repository history only.
 

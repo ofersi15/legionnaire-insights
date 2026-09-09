@@ -56,7 +56,7 @@ storage.clear();
 storage.setItem(LEGACY, JSON.stringify({ choices: [] }));
 assert.equal(activeSaveRecord('football'), null, 'a stale object without a seed is not an active save');
 
-const runtimePath = path.join(__dirname, '..', 'runtime', 'legionnaire-insights-8.4.0.js');
+const runtimePath = path.join(__dirname, '..', 'runtime', 'legionnaire-insights-8.5.0.js');
 const runtime = fs.readFileSync(runtimePath, 'utf8');
 const wrapper = fs.readFileSync(path.join(__dirname, '..', 'legionnaire-insights.user.js'), 'utf8');
 const breakpointMatch = runtime.match(/const DESKTOP_MIN_WIDTH = (\d+);/);
@@ -261,18 +261,25 @@ assert.match(wrapper, /legionnaire-insights:club-cache-v4/, 'single-club fallbac
 const lookupContext = { unsafeWindow: undefined };
 vm.runInNewContext(`
   const norm = (value) => String(value || '').replace(/\\s+/g, ' ').trim();
+  ${extractFunction(runtime, 'visibleProbabilityBands')}
+  ${extractFunction(runtime, 'outcomeBase')}
+  ${extractFunction(runtime, 'signedEffectTokens')}
+  ${extractFunction(runtime, 'visibleOutcomeBase')}
+  ${extractFunction(runtime, 'visibleOutcomeText')}
+  ${extractFunction(runtime, 'outcomeMatchesBand')}
   ${extractFunction(runtime, 'propsMatchVisibleCard')}
   ${extractFunction(runtime, 'decisionStepFromId')}
   ${extractFunction(runtime, 'localDecisionProps')}
   globalThis.lookup = localDecisionProps;
+  globalThis.matchesOutcome = outcomeMatchesBand;
 `, lookupContext);
 
 const currentOption = {
   id: 'visible-option',
   label: 'האפשרות הנוכחית',
   outcomes: [
-    { probability: 0.7, resultLabel: 'התוצאה הטובה' },
-    { probability: 0.3, resultLabel: 'התוצאה הרעה' },
+    { probability: 0.7, resultLabel: 'התוצאה הטובה · כושר הקבוצה +6, אמון ההנהלה -6' },
+    { probability: 0.3, resultLabel: 'התוצאה הרעה · אמון ההנהלה -12' },
   ],
 };
 const staleOption = {
@@ -287,15 +294,32 @@ const currentProps = { decision: { id: 'fixture-seed-4-current' }, option: curre
 const staleProps = { decision: { id: 'fixture-seed-3-previous' }, option: staleOption };
 const currentHostProps = { onClick() {} };
 const staleHostProps = { onClick() {} };
+const renderedOutcomes = [
+  'התוצאה הטובה · כושר +6 70%',
+  'התוצאה הרעה · אמון -12 30%',
+];
+const currentBands = renderedOutcomes.map((text, index) => ({
+  textContent: text,
+  children: [{ textContent: text.split(/ \d+%$/)[0], matches: () => false }],
+  matches: () => false,
+  probability: currentOption.outcomes[index].probability,
+}));
+currentBands[0].parentElement = {
+  style: { display: 'contents' },
+  children: [currentBands[0], { textContent: 'אמון -6' }],
+  textContent: `${currentBands[0].textContent} אמון -6`,
+};
+const currentOdds = currentBands.map((band, index) => ({
+  textContent: `${Math.round(currentOption.outcomes[index].probability * 100)}%`,
+  closest: () => band,
+}));
 const fakeCard = {
   wrappedJSObject: null,
   querySelector(selector) {
     return selector === '.option__name' ? { textContent: currentOption.label } : null;
   },
   querySelectorAll(selector) {
-    return selector === '.pill'
-      ? currentOption.outcomes.map((outcome) => ({ firstElementChild: { textContent: outcome.resultLabel } }))
-      : [];
+    return selector === '.pill__odds,.num' ? currentOdds : [];
   },
 };
 fakeCard['__reactProps$fixture'] = currentHostProps;
@@ -312,8 +336,35 @@ const liveContext = lookupContext.lookup(fakeCard, 0, saveRecords);
 assert.equal(liveContext.props.option.id, currentOption.id, 'lookup must select the component attached to the committed host props');
 assert.equal(liveContext.record.key, LEGACY, 'lookup must select the save whose seed owns the live decision');
 assert.equal(liveContext.step, 4, 'decision step must come from the live decision ID, not the nine saved choices');
+currentOdds[0].textContent = '69%';
+assert.equal(lookupContext.lookup(fakeCard, 0, saveRecords), null, 'lookup must reject a visible probability that differs from React props');
+currentOdds[0].textContent = '70%';
 fakeCard['__reactFiber$fixture'].alternate.return.memoizedProps = { ...currentProps, decision: { id: 'unknown-seed-4-current' } };
 assert.equal(lookupContext.lookup(fakeCard, 0, saveRecords), null, 'lookup must fail closed when no active save owns the committed decision');
+assert.equal(lookupContext.matchesOutcome(
+  { probability: 0.6, resultLabel: 'חזרו רעננים · כושר הקבוצה +12, אמון ההנהלה -6' },
+  { probability: 0.6, band: {
+    textContent: '60% כושר +12 · אמון -6',
+    children: [{ textContent: 'כושר +12 · אמון -6', matches: () => false }],
+    matches: (selector) => selector === '.pill--outcome',
+  } },
+), true, 'compact manager outcomes must match their visible probability and complete effect signature');
+
+const managerDomContext = {};
+vm.runInNewContext(`
+  const norm = (value) => String(value || '').replace(/\\s+/g, ' ').trim();
+  const managerTrainingSlugByLabel = new Map([
+    ['מפגש עם ארגון האוהדים', 'fans'],
+    ['קפה עם סוכן מחו"ל', 'agent'],
+    ['שבוע חופש לסגל', 'rest'],
+  ]);
+  ${extractFunction(runtime, 'managerOptionIdFromCard')}
+  globalThis.optionId = managerOptionIdFromCard({
+    textContent: '📋 מפגש עם ארגון האוהדים 55% מוניטין +6 45% מוניטין -3',
+    querySelector() { return null; },
+  }, 6);
+`, managerDomContext);
+assert.equal(managerDomContext.optionId, 'mgr-train-fans-6', 'manager routine cards must resolve their exact seeded option ID from the visible label');
 
 function seedHash(text) {
   let state = 2166136261 >>> 0;
