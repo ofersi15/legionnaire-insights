@@ -3,7 +3,7 @@
 ## Current state
 
 - Userscript: `legionnaire-insights.user.js`
-- Current release: `8.5.4`; active runtime: `8.5.4`
+- Current release: `8.5.5`; active runtime: `8.5.5`
 - Target: `https://www.legionnaire.xyz/*`
 - Chrome desktop and Firefox Android use Tampermonkey.
 - Delivery: GitHub raw URL in `@updateURL` and `@downloadURL`.
@@ -13,7 +13,7 @@ The React SPA has no account/backend. Saves are event-sourced in `localStorage`;
 
 ## Features
 
-- Player POT comes from the seed. Coach careers use the explicit `career` field (with a narrow legacy choice fallback), never the shared `manager` flag; coach details omit player-only fields and tools.
+- Player POT comes from the seed. Direct coach careers use the explicit `career` field; post-player coach branches are identified by their committed `mgr-accept-<step>` choice, with a narrow legacy setup fallback. The shared `manager` flag is never trusted; coach details omit player-only fields and tools.
 - Active-save lookup checks sport v2, legacy football `maslul-kariera:save:v1`, then the other sport for compatibility.
 - Career-screen detection prefers a visible OVR tile and falls back to rendered career text on Firefox/React layouts where the OVR caption is not cleanly discoverable in the DOM. A save alone is never enough to show POT.
 - Outside a career screen the HUD shows only `LI`; stale save data must never expose a fake POT.
@@ -35,7 +35,7 @@ The React SPA has no account/backend. Saves are event-sourced in `localStorage`;
 
 `legionnaire-insights.user.js` `@require`s exactly one runtime:
 
-- `runtime/legionnaire-insights-8.5.4.js`
+- `runtime/legionnaire-insights-8.5.5.js`
 
 The active install does **not** load `legionnaire-insights-core-7.2.0.js`, any `perf-gate-*`, any `native-ui-7.x`, or `diagnostics-7.10.0.js`. Those files remain in repository history only.
 

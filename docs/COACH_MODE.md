@@ -15,7 +15,7 @@ Evidence came from the live game bundle `index-C6NZkW9Y.js`, isolated browser pl
 - Football and basketball club data overlap in names and IDs, so lookups and caches must remain sport-qualified.
 - Sync must preserve player/coach and divergent choice branches. An active save may advance only for the same seed/mode and an exact local-choice prefix.
 
-## Shipped in 8.4–8.5.3
+## Shipped in 8.4–8.5.5
 
 - Coach-aware HUD, details and navigation; player-only information suppressed.
 - Coach RNG namespace for standard deterministic previews, with narrow salary/summer fallbacks.
@@ -26,18 +26,20 @@ Evidence came from the live game bundle `index-C6NZkW9Y.js`, isolated browser pl
 - 8.5.2 replays the real manager season cursor instead of treating setup choices as seasons. It covers direct starts, source-indexed and basketball-only events, scouting/sales, salary/routine choices and formation switches; rendered choices below the viewport are decorated too.
 - The card-local React route now begins at every decision button, including scout cards, and targets probability bands rather than assuming one visual pill per outcome.
 - 8.5.3 identifies current careers from `career: "player"|"coach"`; the game's shared `manager: true` field no longer misclassifies player careers.
+- 8.5.5 recognizes the game's post-retirement coach branch from its committed `mgr-accept-<playerStep>` choice. These saves intentionally retain `career: "player"`, so the branch marker must override that field after acceptance without weakening Sync identity before acceptance.
 
 The 8.5.2 verification reused the unchanged live asset `https://www.legionnaire.xyz/assets/index-C6NZkW9Y.js` (recorded SHA-256 `AEBD7D0C8429CD5D2241CD8E805289BEC8DA851C98C2BC014BBC0E907AD8A136`). Two direct coach careers in each sport were played in the isolated sandbox (both football careers and one basketball career reached age 70; the other basketball career ended through its normal game path). Forecast coverage was checked on every encountered probabilistic button, and selected forecasts were compared with the roulette's landed outcome index. The run exposed and then closed gaps in first-season cursor inference, below-fold options, scout cards, sale follow-ups, formation switches and basketball-only event classification.
 
+The 8.5.5 verification reused that unchanged URL/hash and played two complete player-to-coach careers in each sport. Both football branches completed normally (one at age 70); one basketball branch ran through a long coach career and the other ended through the normal early no-job path after one coach season. Every encountered coach probability band was checked for a forecast: 26 in football flow 1, 12 in football flow 2, 31 in basketball flow 1, and none occurred in the short basketball flow 2. Eight selected football forecasts were compared with the roulette's landed index and all eight matched. The coach HUD appeared immediately after each `mgr-accept-*` choice and no post-acceptance player POT/tools remained.
+
 ## Open questions, in priority order
 
-1. Extend the compact decision inventory to the retired-player-to-coach branch and any rare national-team/final cards not reached by the four direct-coach runs.
-2. Recheck deterministic previews when the game bundle URL/hash changes. Fail closed when decision ownership, labels or step cannot be proven.
-3. Map transfer-window information: which player/club attributes are visible, which are predetermined, and whether any LI annotation would expose irrelevant player POT.
-4. Calculate exact expected values for budget/summer, salary and sponsorship choices from source effects; distinguish deterministic effects from seeded probability.
-5. Recheck basketball parity on future bundle changes, especially new unsuffixed basketball-only event IDs.
-6. Test cross-device Sync with same seed but different mode/branch and with direct vs post-retirement coach histories.
-7. Run desktop and Android regression passes for overflow, badge collisions, missing OVR and stale player UI.
+1. Recheck deterministic previews when the game bundle URL/hash changes. Fail closed when decision ownership, labels or step cannot be proven.
+2. Map transfer-window information: which player/club attributes are visible, which are predetermined, and whether any LI annotation would expose irrelevant player POT.
+3. Calculate exact expected values for budget/summer, salary and sponsorship choices from source effects; distinguish deterministic effects from seeded probability.
+4. Recheck basketball parity on future bundle changes, especially new unsuffixed basketball-only event IDs.
+5. Test cross-device Sync with same seed but different mode/branch and with direct vs post-retirement coach histories.
+6. Run desktop and Android regression passes for overflow, badge collisions, missing OVR and stale player UI.
 
 ## Safety and evidence rules
 

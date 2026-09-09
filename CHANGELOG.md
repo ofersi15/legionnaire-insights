@@ -1,5 +1,11 @@
 # Changelog
 
+## 8.5.5 - 2026-09-09
+
+- Fixed player-to-coach continuations remaining in player mode. The game deliberately retains `career: "player"` on this branch; LI now switches to coach mode only after the committed `mgr-accept-<step>` choice appears.
+- Restored coach forecasts and removed player POT/Seed Finder UI throughout the continued branch while preserving pre-acceptance player classification and branch-safe Sync merging.
+- Completed two player-to-coach careers in football and two in basketball against the unchanged recorded bundle. All 69 encountered coach probability options had forecasts, and all eight selected forecasts matched the roulette's landed outcome.
+
 ## 8.5.4 - 2026-09-09
 
 - Fixed Seed Finder reloading to the home screen without activating the prepared save. LI now uses the current `.home__resume` control (“המשך מאיפה שהפסקת”), verifies that the pending save still owns the selected seed, and then resumes it automatically.

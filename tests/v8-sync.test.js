@@ -60,8 +60,9 @@ function unionBySeed(a, b) {
 }
 function careerMode(save) {
   if (save?.career === 'coach') return 'coach';
-  if (save?.career === 'player') return 'player';
   const choices = Array.isArray(save?.choices) ? save.choices : [];
+  if (choices.some((choice) => /^mgr-accept-\d+$/.test(String(choice || '')))) return 'coach';
+  if (save?.career === 'player') return 'player';
   return choices.some((choice) => typeof choice === 'string' && /^mgr-(?:philosophy|formation|job)-/.test(choice)) ? 'coach' : 'player';
 }
 function choicesArePrefix(shorter, longer) {
@@ -130,6 +131,7 @@ function deviceFilename(id) { return `legionnaire-device-${id}.snapshot.json`; }
   const local = JSON.stringify({ seed: 'same', choices: ['a'] });
   const remote = JSON.stringify({ seed: 'same', choices: ['a', 'b', 'c'] });
   assert.equal(careerMode({ career: 'player', manager: true, choices: [] }), 'player', 'the shared game manager flag must not turn a player save into a coach save');
+  assert.equal(careerMode({ career: 'player', manager: true, choices: ['player-a', 'mgr-accept-18'] }), 'coach', 'a player-to-coach branch must switch mode after the explicit manager acceptance');
   assert.equal(careerMode({ choices: ['mgr-job-il-1'] }), 'coach', 'legacy coach saves retain a narrow choice-based fallback');
   assert.equal(chooseActiveSave(local, remote), remote, 'same-seed longer save must advance');
   assert.equal(chooseActiveSave(local, JSON.stringify({ seed: 'other', choices: ['x', 'y'] })), local, 'different seeds must keep local');

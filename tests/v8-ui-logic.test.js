@@ -56,7 +56,7 @@ storage.clear();
 storage.setItem(LEGACY, JSON.stringify({ choices: [] }));
 assert.equal(activeSaveRecord('football'), null, 'a stale object without a seed is not an active save');
 
-const runtimePath = path.join(__dirname, '..', 'runtime', 'legionnaire-insights-8.5.4.js');
+const runtimePath = path.join(__dirname, '..', 'runtime', 'legionnaire-insights-8.5.5.js');
 const runtime = fs.readFileSync(runtimePath, 'utf8');
 const wrapper = fs.readFileSync(path.join(__dirname, '..', 'legionnaire-insights.user.js'), 'utf8');
 const careerModeContext = {};
@@ -66,9 +66,10 @@ vm.runInNewContext(`${extractFunction(runtime, 'careerMode')}
     careerMode({ career: 'coach', manager: true, choices: [] }),
     careerMode({ manager: true, choices: [] }),
     careerMode({ choices: ['mgr-philosophy-attacking'] }),
+    careerMode({ career: 'player', manager: true, choices: ['academy-a', 'mgr-accept-19', 'mgr-philosophy-balanced'] }),
   ];`, careerModeContext);
-assert.deepEqual(Array.from(careerModeContext.results), ['player', 'coach', 'player', 'coach'],
-  'career mode must trust the explicit career field, ignore the shared manager flag, and narrowly recognize legacy coach saves');
+assert.deepEqual(Array.from(careerModeContext.results), ['player', 'coach', 'player', 'coach', 'coach'],
+  'career mode must ignore the shared manager flag while recognizing direct, legacy and post-player coach saves');
 assert.match(runtime, /career: 'player'/, 'Seed Finder must write an explicit player career save');
 assert.match(runtime, /JSON\.stringify\(\{ seed: String\(seed\) \}\)/, 'Seed Finder must persist the selected seed across reload');
 assert.match(runtime, /querySelector\('button\.home__resume'\)/, 'Seed Finder must resume through the current game home button');
